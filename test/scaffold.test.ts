@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { createAgentServer } from "../shared/agent-server.ts";
+import { createNearAiClient } from "../shared/nearai.ts";
 import { AGENT_NAMES, AGENTS } from "../shared/registry.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -37,7 +38,7 @@ describe("AG-001 scaffold", () => {
   it("TC-AG-001-04 each agent serves /health as a local server", async () => {
     const ports = new Set<number>();
     for (const name of AGENT_NAMES) {
-      const server = createAgentServer(AGENTS[name]);
+      const server = createAgentServer(AGENTS[name], createNearAiClient({ agent: name, env: { NEARAI_MODE: "mock" }, log: () => {} }));
       await new Promise<void>((r) => server.listen(0, r));
       const { port } = server.address() as AddressInfo;
       const res = await fetch(`http://127.0.0.1:${port}/health`);
