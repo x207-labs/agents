@@ -1,0 +1,21 @@
+{
+  "name": "@x207/agents",
+  "version": "0.0.1",
+  "description": "x207 demo agents: six agents that buy and sell services over x402 with x207 credit settlement",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "agent": "node"
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  },
+  "dependencies": {
+    "@x402/fetch": "2.28.0"
+  }
+}
