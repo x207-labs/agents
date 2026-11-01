@@ -6,7 +6,8 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
     "agent": "node",
-    "test:sandbox": "X207_SANDBOX=1 vitest run sandbox"
+    "test:sandbox": "X207_SANDBOX=1 vitest run sandbox",
+    "check:imports": "node scripts/check-imports.mjs"
   },
   "license": "Apache-2.0",
   "type": "module",
