@@ -30,7 +30,7 @@ export type Stack = {
   stop(): Promise<void>;
 };
 
-export async function startStack(): Promise<Stack> {
+export async function startStack(options: { now?: () => number } = {}): Promise<Stack> {
   const fx = await deployCircle();
   const keysDir = mkdtempSync(join(tmpdir(), "x207-stack-keys-"));
   const servers: Server[] = [];
@@ -55,7 +55,7 @@ export async function startStack(): Promise<Stack> {
   const pending = new PendingStore(":memory:");
   const rpc = new NearRpc({ urls: [fx.sandbox.rpcUrl], timeoutMs: 30_000 });
   const circle = defineCircleConfig({ network: "x207:agents-main", circleContract: fx.circle.accountId });
-  const app = createApp(createFacilitatorService({ circles: [circle], rpc, pending, signers: [relayer.accountId] }));
+  const app = createApp(createFacilitatorService({ circles: [circle], rpc, pending, signers: [relayer.accountId], ...(options.now ? { now: options.now } : {}) }));
   const settled: unknown[] = [];
   const facilitator = await serveWeb(async (request) => {
     const response = await app.fetch(request);
@@ -67,7 +67,7 @@ export async function startStack(): Promise<Stack> {
   const urls = {} as Record<AgentName, string>;
   for (const name of AGENT_NAMES) {
     const spec = AGENTS[name];
-    const paywall = createSellerPaywall(spec, { facilitatorUrl: facilitator.url, circleId: fx.circleId, payTo: identity[name].accountId });
+    const paywall = createSellerPaywall(spec, { facilitatorUrl: facilitator.url, circleId: fx.circleId, payTo: identity[name].accountId, ...(options.now ? { now: options.now } : {}) });
     const server = createAgentServer(spec, createNearAiClient({ agent: name }), paywall);
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     servers.push(server);

@@ -1,7 +1,7 @@
 // Binding x207 untuk agent (AG-005): penjual lewat x207Middleware, pembeli lewat @x402/fetch dengan klien x207.
 // Hanya paket publik @x402/fetch, @x207/scheme, dan @x207/core yang dipakai di sini (AG-006).
 import { wrapFetchWithPayment } from "@x402/fetch";
-import { X207PaymentClient, headroomFromRpc, x207Middleware } from "@x207/scheme";
+import { X207ExtraSource, X207PaymentClient, headroomFromRpc, x207Middleware } from "@x207/scheme";
 import type { Paywall, SellerConfig } from "./agent-server.ts";
 import type { AgentIdentity } from "./identity.ts";
 import type { AgentSpec } from "./registry.ts";
@@ -16,6 +16,7 @@ export function createSellerPaywall(spec: AgentSpec, config: SellerConfig): Payw
     facilitatorUrl: config.facilitatorUrl,
     circleId: config.circleId,
     payTo: config.payTo,
+    ...(config.now ? { extra: new X207ExtraSource({ facilitatorUrl: config.facilitatorUrl, now: config.now }) } : {}),
   });
 }
 

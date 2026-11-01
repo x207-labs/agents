@@ -61,6 +61,8 @@ export type SellerConfig = {
   /** Akun NEAR agent penjual yang menerima pembayaran. */
   payTo: AccountId;
   price?: string;
+  /** Jam untuk cache `extra` (test). */
+  now?: () => number;
 };
 
 export function startAgent(spec: AgentSpec): Server {
