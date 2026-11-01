@@ -24,6 +24,9 @@ export type Stack = {
   /** Respons `/settle` facilitator, urut waktu. */
   settled: unknown[];
   scheduler: RegistrationScheduler;
+  facilitatorUrl: string;
+  rpc: NearRpc;
+  relayer: { accountId: string; secretKey: string };
   stop(): Promise<void>;
 };
 
@@ -76,7 +79,8 @@ export async function startStack(): Promise<Stack> {
     chain: new NearRegistrationChain({ rpc, circleContract: fx.circle.accountId, relayer: { accountId: relayer.accountId, privateKey: relayer.secretKey } }),
   });
   return {
-    fx, identity, urls, pending, settled, scheduler,
+    fx, identity, urls, pending, settled, scheduler, facilitatorUrl: facilitator.url, rpc,
+    relayer: { accountId: relayer.accountId, secretKey: relayer.secretKey },
     async stop() {
       servers.forEach((s) => s.closeAllConnections?.() ?? s.close());
       rmSync(keysDir, { recursive: true, force: true });
