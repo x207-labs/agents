@@ -1,0 +1,4 @@
+{
+  "maxPerCall": "100000",
+  "maxPerEpoch": "50000000"
+}

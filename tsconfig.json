@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["vitest.config.ts", "shared", "agents", "scenario", "test"]
+  "include": ["vitest.config.ts", "shared", "agents", "onboarding", "scenario", "test"]
 }
