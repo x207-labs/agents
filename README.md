@@ -1,6 +1,6 @@
 # x207 agents
 
-Six demo agents that buy and sell services over x402, settled as mutual credit by x207. They use only the public packages `@x402/fetch`, `@x207/scheme` and `@x207/core`.
+Six demo agents that buy and sell services over x402, settled as mutual credit by x207. They use only the public packages `@x402/fetch`, `@x207/scheme` and `@x207/core`. Module M7, features F1, F2 and F5. Part of [x207](https://github.com/x207-labs/x207).
 
 | Agent | Folder | Default port |
 | --- | --- | --- |
