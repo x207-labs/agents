@@ -30,7 +30,9 @@ export type Stack = {
   stop(): Promise<void>;
 };
 
-export async function startStack(options: { now?: () => number } = {}): Promise<Stack> {
+export async function startStack(
+  options: { now?: () => number; onTx?: (tx: { account: string; method: string; hash: string; ms: number }) => void } = {},
+): Promise<Stack> {
   const fx = await deployCircle();
   const keysDir = mkdtempSync(join(tmpdir(), "x207-stack-keys-"));
   const servers: Server[] = [];
@@ -40,8 +42,10 @@ export async function startStack(options: { now?: () => number } = {}): Promise<
     agents: accounts.map((account) => ({
       accountId: account.accountId,
       sendCall: async (call: ContractCall) => {
+        const started = Date.now();
         const result = await account.call(call);
         if (result.failures.length > 0) throw new Error(result.failures.join("; "));
+        options.onTx?.({ account: account.accountId, method: call.methodName, hash: result.hash, ms: Date.now() - started });
         return result.value;
       },
     })),
