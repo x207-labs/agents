@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   ci:
-    uses: x207-labs/x207/.github/workflows/ci-node.yml@aee1de79e1831b28af6ee6912c8af07c5b65618d # OP-002
+    uses: x207-labs/x207/.github/workflows/ci-node.yml@555d66acb3f3e17b72a39347c3be85e4d3a36e47 # OP-002, header restored
     with:
-      sdk-ref: 24df15dac523453e8fca7c6151b89b7c7123cac6
+      sdk-ref: 2f9e1e562b461c235921f21c72522e205fdc64bd
     secrets:
       sdk-token: ${{ secrets.X207_CHECKOUT_TOKEN }}
