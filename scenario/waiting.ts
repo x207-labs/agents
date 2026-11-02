@@ -5,23 +5,27 @@ import { DEFAULT_BARTER_POLICY, PolicyAgent, type BarterPolicy, type StepResult 
 import type { BookClient } from "../shared/barter.ts";
 import type { AgentIdentity } from "../shared/identity.ts";
 
-const CREDIT = 1_000_000;
-const unit = (credits: number): string => String(credits * CREDIT);
+/** Harga satuan default 10 credit per unit (listing bernilai 100 credit); test sandbox memakai harga kecil agar leg bisa dibayar dengan panggilan 0,02. */
+export const DEFAULT_UNIT_MICRO = 10_000_000;
 
-export const WAITING_POLICIES = {
-  seller: {
-    ...DEFAULT_BARTER_POLICY,
-    holdings: [{ assetType: "service:translate-calls", assetClass: "D", quantity: 10, unitValue: unit(10) }],
-    needs: [{ assetType: "service:summarize-calls", assetClass: "D", quantity: 10, maxUnitValue: unit(10) }],
-    listingTtlSeconds: 6 * 3600,
-  },
-  late: {
-    ...DEFAULT_BARTER_POLICY,
-    holdings: [{ assetType: "service:summarize-calls", assetClass: "D", quantity: 10, unitValue: unit(10) }],
-    // pembeli terlambat hanya mau membayar sampai 9,2 per unit: perlu dua putaran tawar
-    needs: [{ assetType: "service:translate-calls", assetClass: "D", quantity: 10, maxUnitValue: "9200000" }],
-  },
-} satisfies Record<string, BarterPolicy>;
+export function waitingPolicies(unitMicro: number = DEFAULT_UNIT_MICRO) {
+  return {
+    seller: {
+      ...DEFAULT_BARTER_POLICY,
+      holdings: [{ assetType: "service:translate-calls", assetClass: "D", quantity: 10, unitValue: String(unitMicro) }],
+      needs: [{ assetType: "service:summarize-calls", assetClass: "D", quantity: 10, maxUnitValue: String(unitMicro) }],
+      listingTtlSeconds: 6 * 3600,
+    },
+    late: {
+      ...DEFAULT_BARTER_POLICY,
+      holdings: [{ assetType: "service:summarize-calls", assetClass: "D", quantity: 10, unitValue: String(unitMicro) }],
+      // pembeli terlambat hanya mau membayar sampai 92% per unit: perlu dua putaran tawar
+      needs: [{ assetType: "service:translate-calls", assetClass: "D", quantity: 10, maxUnitValue: String(Math.round(unitMicro * 0.92)) }],
+    },
+  } satisfies Record<string, BarterPolicy>;
+}
+
+export const WAITING_POLICIES = waitingPolicies();
 
 export type WaitingEvent = { at: number; what: string };
 
@@ -43,20 +47,23 @@ export async function runWaitingScenario(args: {
   clock: { now: number };
   /** Geser jam semua pihak (agent dan server) sebesar `seconds`. */
   advance: (seconds: number) => void;
+  /** Harga satuan dalam satuan terkecil credit; default 10 credit. */
+  unitMicro?: number;
 }): Promise<WaitingReport> {
   const { book, clock } = args;
   const now = () => clock.now;
   const timeline: WaitingEvent[] = [];
   const note = (what: string) => timeline.push({ at: clock.now, what });
   const make = (identity: AgentIdentity, policy: BarterPolicy) => new PolicyAgent({ identity, book, contractId: args.contractId, policy, now });
-  const andi = make(args.seller, WAITING_POLICIES.seller);
-  const budi = make(args.late, WAITING_POLICIES.late);
+  const policies = waitingPolicies(args.unitMicro);
+  const andi = make(args.seller, policies.seller);
+  const budi = make(args.late, policies.late);
 
   const listedAt = clock.now;
   const { hash } = await andi.list();
   note("andi lists translate-calls, wants summarize-calls; no counterparty exists yet");
   // Listing kedua dengan umur pendek yang tidak akan mendapat lawan
-  const short = new PolicyAgent({ identity: args.seller, book, contractId: args.contractId, policy: { ...WAITING_POLICIES.seller, listingTtlSeconds: 1800 }, now });
+  const short = new PolicyAgent({ identity: args.seller, book, contractId: args.contractId, policy: { ...policies.seller, listingTtlSeconds: 1800 }, now });
   const { hash: expiredHash } = await short.list();
   note("andi also lists a short-lived offer that nobody will take");
 
