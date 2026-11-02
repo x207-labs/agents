@@ -2,9 +2,8 @@
 // ada di demo/classb.demo.ts (npm run demo:classb).
 import { describe, expect, it } from "vitest";
 import { base58Decode, parseFunctionCallKeyScope, voucherPublicKey, type ContractCall } from "@x207/core";
-import {
-  CLASS_B_ASSET_TYPE, acceptRental, assertProbe, newAccessKey, offerRental, payLease, probeKey, rentalScope, type CallWithKey, type KeyProbe,
-} from "../scenario/classb.ts";
+import { acceptRental, offerRental } from "../onboarding/rental.ts";
+import { CLASS_B_ASSET_TYPE, assertProbe, newAccessKey, payLease, probeKey, rentalScope, type CallWithKey, type KeyProbe } from "../scenario/classb.ts";
 
 describe("AG-015 skenario kelas B", () => {
   it("newAccessKey: format NEAR 64 byte (seed + publik), publik cocok dengan seed, deterministik untuk seed yang sama", () => {
@@ -63,8 +62,8 @@ describe("AG-015 skenario kelas B", () => {
     expect(() => assertProbe(probe)).not.toThrow();
     const ok = { ok: true, hash: "h" } as const;
     const no = { ok: false, error: "x" } as const;
-    expect(() => assertProbe({ allowed: no, otherMethod: no, withDeposit: no } satisfies KeyProbe)).toThrow(/diizinkan gagal/);
-    expect(() => assertProbe({ allowed: ok, otherMethod: ok, withDeposit: no })).toThrow(/method di luar/);
-    expect(() => assertProbe({ allowed: ok, otherMethod: no, withDeposit: ok })).toThrow(/deposit/);
+    expect(() => assertProbe({ allowed: no, otherMethod: no, withFunds: no } satisfies KeyProbe)).toThrow(/diizinkan gagal/);
+    expect(() => assertProbe({ allowed: ok, otherMethod: ok, withFunds: no })).toThrow(/method di luar/);
+    expect(() => assertProbe({ allowed: ok, otherMethod: no, withFunds: ok })).toThrow(/dana terlampir/);
   });
 });

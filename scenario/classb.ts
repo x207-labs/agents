@@ -1,16 +1,12 @@
 // Skenario demo kelas B (AG-015, F8): pemilik menyewakan akses akun NEAR lewat function-call key, penyewa membayar sewa dengan voucher x402 biasa ke broker
-// dan menerima key itu, memanggil method yang diizinkan, lalu method lain dan deposit ditolak oleh protokol NEAR sendiri. Saat penyewa `defaulted`
+// dan menerima key itu, memanggil method yang diizinkan, lalu method lain dan dana terlampir ditolak oleh protokol NEAR sendiri. Saat penyewa `defaulted`
 // broker menghapus key. Modul ini hanya memegang peran dan urutan; semua I/O (transaksi, HTTP, kunci akses) disuntik oleh pemanggil, karena agent
-// tidak boleh memegang kunci akses akun (AG-007): kunci voucher hanya menandatangani voucher, dan kunci function-call milik penyewa dipakai lewat
+// tidak boleh memegang kunci akses akun (AG-007); transaksi pemberi dan penyewa (offer_grant, accept_grant) ada di onboarding/rental.ts: kunci voucher hanya menandatangani voucher, dan kunci function-call milik penyewa dipakai lewat
 // `callWithKey` yang disediakan orkestrasi (demo/classb.demo.ts).
 import { createPrivateKey, createPublicKey, randomBytes } from "node:crypto";
-import { base58Encode, type ContractCall } from "@x207/core";
-
-/** Mengirim satu panggilan kontrak dari akun seorang anggota (pemberi atau penyewa) dan mengembalikan nilai suksesnya. */
-export type SendCall = (call: ContractCall) => Promise<unknown>;
+import { base58Encode } from "@x207/core";
 
 export const CLASS_B_ASSET_TYPE = "near-rpc:access";
-export const CLASS_B_DELIVERY = "near_access_key";
 const DAY_MS = 86_400_000;
 export const DEFAULT_ALLOWANCE = "1000000000000000000000000";
 const PKCS8_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
@@ -29,41 +25,6 @@ export function rentalScope(receiverId: string, methodNames: readonly string[], 
   return JSON.stringify({ receiver_id: receiverId, method_names: methodNames, allowance });
 }
 
-export type OfferRental = {
-  /** Akun pemberi mengirim `offer_grant`. */
-  send: SendCall;
-  contract: string;
-  scope: string;
-  /** Credit satuan terkecil per hari. */
-  unitPrice: string;
-  /** Akun broker yang menyerahkan key (`operator` grant). */
-  operator: string;
-  /** Batas akhir grant, milidetik Unix. */
-  expiresAtMs: number;
-};
-
-/** Pemberi menawarkan sewa harian; mengembalikan `grant_id`. */
-export async function offerRental(o: OfferRental): Promise<number> {
-  const id = await o.send({
-    receiverId: o.contract, methodName: "offer_grant", deposit: 0n,
-    args: {
-      input: {
-        asset_type: CLASS_B_ASSET_TYPE, delivery_method: CLASS_B_DELIVERY,
-        limits: { scope: o.scope, quota: null, expires_at: (BigInt(o.expiresAtMs) * 1_000_000n).toString() },
-        unit: "day", unit_price: o.unitPrice, operator: o.operator, proof_hash: null, proof_kind: null,
-      },
-    },
-  });
-  return Number(id);
-}
-
-/** Penyewa menerima grant dengan kunci function-call miliknya sendiri sebagai `delivery_pubkey`; kunci rahasia tetap di penyewa. */
-export async function acceptRental(o: { send: SendCall; contract: string; grantId: number; key?: AccessKey }): Promise<AccessKey> {
-  const key = o.key ?? newAccessKey();
-  await o.send({ receiverId: o.contract, methodName: "accept_grant", args: { grant_id: o.grantId, delivery_pubkey: key.publicKey }, deposit: 0n });
-  return key;
-}
-
 export type LeaseResult = { status: number; body: Record<string, unknown>; paymentResponse: boolean };
 
 /** Penyewa meminta sewa ke broker lewat `buy` (fetch x402 dengan voucher); 402 dibayar otomatis, hasilnya key yang terpasang sampai `paidUntil`. */
@@ -74,16 +35,17 @@ export async function payLease(o: { buy: typeof fetch; brokerUrl: string; grantI
 
 /** Hasil satu panggilan dengan function-call key: sukses atau ditolak (pesan galat protokol). */
 export type KeyCallOutcome = { ok: true; hash: string } | { ok: false; error: string };
-export type CallWithKey = (key: AccessKey, methodName: string, deposit: bigint) => Promise<KeyCallOutcome>;
+/** `attachedYocto` = dana yang dilampirkan ke panggilan; function-call key tidak boleh melampirkannya. */
+export type CallWithKey = (key: AccessKey, methodName: string, attachedYocto: bigint) => Promise<KeyCallOutcome>;
 
-export type KeyProbe = { allowed: KeyCallOutcome; otherMethod: KeyCallOutcome; withDeposit: KeyCallOutcome };
+export type KeyProbe = { allowed: KeyCallOutcome; otherMethod: KeyCallOutcome; withFunds: KeyCallOutcome };
 
-/** Protokol NEAR sendiri membatasi key: method yang diizinkan jalan, method lain dan deposit ditolak. Tidak ada kode x207 di jalur ini. */
+/** Protokol NEAR sendiri membatasi key: method yang diizinkan jalan, method lain dan dana terlampir ditolak. Tidak ada kode x207 di jalur ini. */
 export async function probeKey(call: CallWithKey, key: AccessKey, allowedMethod: string, otherMethod: string): Promise<KeyProbe> {
   return {
     allowed: await call(key, allowedMethod, 0n),
     otherMethod: await call(key, otherMethod, 0n),
-    withDeposit: await call(key, allowedMethod, 1n),
+    withFunds: await call(key, allowedMethod, 1n),
   };
 }
 
@@ -91,7 +53,7 @@ export async function probeKey(call: CallWithKey, key: AccessKey, allowedMethod:
 export function assertProbe(probe: KeyProbe): void {
   if (!probe.allowed.ok) throw new Error(`panggilan yang diizinkan gagal: ${probe.allowed.error}`);
   if (probe.otherMethod.ok) throw new Error("method di luar daftar seharusnya ditolak");
-  if (probe.withDeposit.ok) throw new Error("panggilan dengan deposit seharusnya ditolak");
+  if (probe.withFunds.ok) throw new Error("panggilan dengan dana terlampir seharusnya ditolak");
 }
 
 /** Satu hari sewa dalam milidetik, untuk menghitung `expires_at` dan `paidUntil`. */
