@@ -3,10 +3,11 @@
 // keputusan, tetapi usulan yang melanggar batas kebijakan (nilai di bawah lantai atau di atas plafon, kata aksi tak dikenal) dibuang
 // dan aturan dasar yang dipakai: kebijakan pemilik selalu menang atas keluaran model.
 import {
-  ASSET_CLASSES, listingHash, planOffer, signBundle, signListing, signOffer, termsHash,
-  type AssetClass, type Listing, type Offer,
+  ASSET_CLASSES, listingHash, planOffer, signBundle, signListing, signOffer, signReferral, signRefuseReferral, termsHash,
+  type AssetClass, type Listing, type Offer, type Referral,
 } from "@x207/core";
-import { BookClient, type AcceptResult, type ListingView, type OfferView } from "./barter.ts";
+import { BookClient, type AcceptResult, type ListingView, type OfferView, type ReferralView } from "./barter.ts";
+import type { SeekerPlan } from "./seeker.ts";
 import type { AgentIdentity } from "./identity.ts";
 import type { LlmClient } from "./nearai.ts";
 
@@ -32,6 +33,8 @@ export type BarterPolicy = {
   /** Besar konsesi per ronde (bps dari nilai `offer` listing). */
   stepBps: number;
   maxRounds: number;
+  /** Opt-in ajakan pencari (SV-016): tanpa ini setiap ajakan di kotak masuk ditolak. */
+  acceptReferrals: boolean;
   /** Penjual: batas jumlah per pesanan tidak boleh melebihi listing; selalu berlaku. */
   deliverDays: number;
 };
@@ -48,6 +51,7 @@ export const DEFAULT_BARTER_POLICY: BarterPolicy = {
   openingBps: 8500,
   stepBps: 500,
   maxRounds: 6,
+  acceptReferrals: true,
   deliverDays: 3,
 };
 
@@ -235,14 +239,50 @@ export class PolicyAgent {
     };
   }
 
-  async #postOffer(listing: ListingView, round: number, mode: "pay" | "barter", value: string, quantity: number, inReplyTo?: string): Promise<OfferView> {
+  async #postOffer(listing: ListingView, round: number, mode: "pay" | "barter", value: string, quantity: number, inReplyTo?: string, referralHashHex?: string): Promise<OfferView> {
     const offer: Offer = {
       circle: this.#contractId, listing_hash: listing.listingHash, proposer: this.identity.accountId, round, mode, value, quantity,
       deliver_by: this.#now() + this.policy.deliverDays * 86_400,
     };
-    const view = await this.book.postOffer(listing.listingHash, offer, signOffer(offer, this.identity.voucherSecretKey), inReplyTo);
+    const view = await this.book.postOffer(listing.listingHash, offer, signOffer(offer, this.identity.voucherSecretKey), inReplyTo, referralHashHex);
     this.#ownLast.set(listing.listingHash, value);
     return view;
+  }
+
+  /**
+   * Pencari: tandatangani ajakan dari rencana `SeekerBot` dan kirim ke kotak masuk agent tujuan. Penawarannya tetap harus ditandatangani
+   * agent tujuan sendiri (`handleReferrals`). `ttlSeconds` default 1 jam.
+   */
+  async sendReferral(plan: SeekerPlan, searcherShareBps: number, ttlSeconds = 3600): Promise<ReferralView> {
+    const referral: Referral = {
+      circle: this.#contractId, seeker: this.identity.accountId, to: plan.to, listing_hash: plan.listing.listingHash, mode: plan.mode, value: plan.value,
+      quantity: plan.quantity, deliver_by: this.#now() + this.policy.deliverDays * 86_400, searcher_share_bps: searcherShareBps,
+      expires_at: this.#now() + ttlSeconds, nonce: `${this.identity.accountId.split(".")[0]}-${this.#now()}-${(this.#counter += 1)}`.replace(NONCE, "-").slice(0, 64),
+    };
+    const view = await this.book.postReferral(referral, signReferral(referral, this.identity.voucherSecretKey));
+    return view;
+  }
+
+  /**
+   * Agent tujuan: jawab ajakan di kotak masuk. Ajakan yang cocok dengan kebutuhan agent dan kebijakan `acceptReferrals` dijawab dengan
+   * penawaran ronde 1 buatan agent sendiri yang merujuk ajakan (jatah pencari melekat di utas); selain itu ditolak dengan tanda tangan.
+   */
+  async handleReferrals(): Promise<Array<{ referralHash: string; action: "bid" | "refused"; reason?: string; offerHash?: string }>> {
+    const answers: Array<{ referralHash: string; action: "bid" | "refused"; reason?: string; offerHash?: string }> = [];
+    const open = await this.book.listings({ status: "open" });
+    for (const referral of await this.book.referralInbox(this.identity.accountId)) {
+      const view = open.find((l) => l.listingHash === referral.listingHash);
+      const fit = view ? matchesPolicy(view, this.identity.accountId, this.policy) : null;
+      const reason = !this.policy.acceptReferrals ? "not_opted_in" : !view ? "listing_gone" : fit === null ? "no_need" : referral.mode === "barter" && fit !== "barter" ? "no_goods" : undefined;
+      if (reason !== undefined) {
+        await this.book.refuseReferral(referral.referralHash, signRefuseReferral(referral.referralHash, this.#contractId, this.identity.voucherSecretKey));
+        answers.push({ referralHash: referral.referralHash, action: "refused", reason });
+        continue;
+      }
+      const sent = await this.#postOffer(view!, 1, referral.mode, referral.value, referral.quantity, undefined, referral.referralHash);
+      answers.push({ referralHash: referral.referralHash, action: "bid", offerHash: sent.offerHash });
+    }
+    return answers;
   }
 
   /** Cari listing yang cocok dengan kebutuhan dan ajukan tawaran pembuka (ronde 1). */

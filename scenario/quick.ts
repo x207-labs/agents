@@ -57,8 +57,16 @@ export async function runQuickBarter(args: {
   await andiPay.list();
   await andiBarter.list();
 
-  const budi = make(identities.payer, DEFAULT_BARTER_POLICY);
-  const citra = make(identities.barterer, DEFAULT_BARTER_POLICY);
+  // Budi butuh jasa terjemahan dan membayar dengan credit; Citra butuh paket terjemahan dan menyerahkan jasa scrape
+  const budi = make(identities.payer, {
+    ...DEFAULT_BARTER_POLICY,
+    needs: [{ assetType: "service:translate-calls", assetClass: "D", quantity: 10, maxUnitValue: unit(value / 10) }],
+  });
+  const citra = make(identities.barterer, {
+    ...DEFAULT_BARTER_POLICY,
+    holdings: [{ assetType: "service:scrape-calls", assetClass: "D", quantity: 10, unitValue: unit(value / 10) }],
+    needs: [{ assetType: "service:translate-batch", assetClass: "D", quantity: 10, maxUnitValue: unit(value / 10) }],
+  });
   const seeker = make(identities.seeker, DEFAULT_BARTER_POLICY);
   const visited: VisitedAgent[] = [
     { account: identities.payer.accountId, optIn: true, idle: true, canPay: true, offers: [] },
@@ -69,14 +77,14 @@ export async function runQuickBarter(args: {
   const bot = new SeekerBot({ seeker: identities.seeker.accountId, searcherShareBps: params.searcherShareBps, maxOffersPerAgent: 1, periodSeconds: 3600 });
   const plans: SeekerPlan[] = bot.plan(await book.listings({ status: "open" }), visited, now());
 
-  const referrals = new Map<string, { searcher: string; searcherShareBps: number }>();
+  // Pencari mengirim ajakan bertanda tangan ke kotak masuk; agent tujuan menawar sendiri; pemasang menerima dan jatah melekat dari ajakan
   for (const plan of plans) {
-    const agent = plan.to === identities.payer.accountId ? budi : citra;
-    const bid = await agent.bidFromReferral(plan);
-    if (bid.kind === "bid") referrals.set(bid.offerHash, { searcher: identities.seeker.accountId, searcherShareBps: params.searcherShareBps });
+    await seeker.sendReferral(plan, params.searcherShareBps);
     bot.record(plan.to, now());
   }
-  await andiPay.handleInbox({ referral: (offer) => referrals.get(offer.offerHash) });
+  const answers = [...(await budi.handleReferrals()), ...(await citra.handleReferrals())];
+  if (answers.some((a) => a.action !== "bid")) throw new Error(`ajakan ditolak: ${JSON.stringify(answers)}`);
+  await andiPay.handleInbox();
   for (const agent of [andiPay, budi, citra, seeker]) await agent.signProposals();
 
   const proposals = await book.proposals(identities.seller.accountId, "all");

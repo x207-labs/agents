@@ -65,3 +65,27 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-018 barter cepat dan pencari", () => {
     expect(refusing.plan(listings, [agent()], NOW).map((p) => p.listing.listingHash)).toEqual(["b".repeat(64)]);
   });
 });
+
+describe.skipIf(!BACKEND_AVAILABLE)("AG-018 ajakan pencari: kotak masuk dan penolakan", () => {
+  let market: MarketBook | undefined;
+  afterEach(async () => market?.stop());
+
+  it("TC-AG-018-03 agent tanpa opt-in menolak dengan tanda tangan dan pencari tidak bisa mengajak lagi pasangan itu", async () => {
+    market = await startMarketBook(["translator", "summarizer", "cleaner"], { now: NOW * 1000 });
+    const m = market;
+    const { DEFAULT_BARTER_POLICY, PolicyAgent } = await import("../shared/barter-policy.ts");
+    const make = (name: string, policy: any) => new PolicyAgent({ identity: m.identities[name]!, book: m.book, contractId: CONTRACT, policy, now: () => NOW });
+    const seller = make("translator", { ...DEFAULT_BARTER_POLICY, holdings: [{ assetType: "a", assetClass: "D", quantity: 1, unitValue: C(100) }], needs: [{ assetType: "b", assetClass: "D", quantity: 1, maxUnitValue: C(100) }] });
+    const target = make("summarizer", { ...DEFAULT_BARTER_POLICY, acceptReferrals: false, needs: [{ assetType: "a", assetClass: "D", quantity: 1, maxUnitValue: C(100) }] });
+    const seeker = make("cleaner", DEFAULT_BARTER_POLICY);
+    const { hash } = await seller.list();
+    const [listing] = await m.book.listings({ status: "open" });
+    const plan = { to: acct("summarizer"), listing: listing!, mode: "pay" as const, value: listing!.offer.value, quantity: 1 };
+
+    const sent = await seeker.sendReferral(plan, 300);
+    expect(sent).toMatchObject({ status: "pending", listingHash: hash, searcherShareBps: 300 });
+    expect(await target.handleReferrals()).toEqual([{ referralHash: sent.referralHash, action: "refused", reason: "not_opted_in" }]);
+    expect(await m.book.referralInbox(acct("summarizer"))).toEqual([]);
+    await expect(seeker.sendReferral(plan, 300)).rejects.toMatchObject({ code: "referral_refused" });
+  });
+});

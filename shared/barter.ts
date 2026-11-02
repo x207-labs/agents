@@ -3,7 +3,7 @@
 // agent tidak pernah mengirim transaksi, jadi argumen `post_intent` dikembalikan ke pemanggil yang memegang pengirim transaksi.
 import {
   bundleParticipants, intentHash, intentHashBase58, signBundle, signIntent, termsHash,
-  type BarterIntent, type BarterSide, type BundleSignature, type BundleTerms, type Listing, type Offer,
+  type BarterIntent, type BarterSide, type BundleSignature, type BundleTerms, type Listing, type Offer, type Referral,
 } from "@x207/core";
 import type { AgentIdentity } from "./identity.ts";
 
@@ -96,6 +96,21 @@ export type AcceptResult = {
   result: { kind: "payment"; payer: string; payee: string; amount: string } | { kind: "bundle"; proposal: BundleProposalView };
 };
 
+export type ReferralView = {
+  referralHash: string;
+  seeker: string;
+  to: string;
+  listingHash: string;
+  mode: "pay" | "barter";
+  value: string;
+  quantity: number;
+  deliverBy: string;
+  searcherShareBps: number;
+  expiresAt: string;
+  status: string;
+  offerHash: string | null;
+};
+
 export type EpochSummary = { epoch: number; phase: string };
 
 /** Klien tipis atas read API dan buku marketplace; satu instance per lingkaran. */
@@ -155,8 +170,24 @@ export class BookClient {
   async inbox(account: string): Promise<OfferView[]> {
     return (await this.get<{ items: OfferView[] }>(`/offers?account=${encodeURIComponent(account)}&box=inbox`)).items;
   }
-  postOffer(listingHash: string, offer: Offer, signature: string, inReplyTo?: string): Promise<OfferView> {
-    return this.post<OfferView>(`/listings/${listingHash}/offers`, { offer, signature, ...(inReplyTo ? { inReplyTo } : {}) });
+  postOffer(listingHash: string, offer: Offer, signature: string, inReplyTo?: string, referralHash?: string): Promise<OfferView> {
+    return this.post<OfferView>(`/listings/${listingHash}/offers`, {
+      offer, signature, ...(inReplyTo ? { inReplyTo } : {}), ...(referralHash ? { referralHash } : {}),
+    });
+  }
+  /** Usulan bundle dari solver tanpa kecocokan listing (SV-011): server menghitung ulang `terms_hash` dan memeriksa epoch open. */
+  postBundleProposal(terms: BundleTerms): Promise<BundleProposalView> {
+    return this.post<BundleProposalView>("/bundle-proposals", { terms, termsHash: termsHash(terms) });
+  }
+  postReferral(referral: Referral, signature: string): Promise<ReferralView> {
+    return this.post<ReferralView>("/referrals", { referral, signature });
+  }
+  /** Kotak masuk ajakan pencari yang masih pending untuk `account`. */
+  async referralInbox(account: string): Promise<ReferralView[]> {
+    return (await this.get<{ items: ReferralView[] }>(`/referrals?account=${encodeURIComponent(account)}&box=inbox`)).items;
+  }
+  refuseReferral(referralHash: string, signature: string): Promise<ReferralView> {
+    return this.post<ReferralView>(`/referrals/${referralHash}/refuse`, { signature });
   }
   previewAccept(listingHash: string, offerHash: string, body: { account: string; searcher?: string; searcherShareBps?: number }): Promise<AcceptPreview> {
     return this.post<AcceptPreview>(`/listings/${listingHash}/offers/${offerHash}/preview`, body);
