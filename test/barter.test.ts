@@ -92,6 +92,17 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need dan usulan bundle"
     expect(await translator.signTerms(ringTerms(41))).toBeNull(); // bukan epoch open
   });
 
+  it("TC-AG-012-06 solver mengirim usulan lewat POST bundle-proposals dan agent menandatanganinya sampai ready", async () => {
+    const { m, agents } = await setup();
+    for (const r of RING) await agents.get(r.name)!.postIntent(r.offer, r.need);
+    const created = await m.book.postBundleProposal(ringTerms());
+    expect(created).toMatchObject({ status: "proposed", epoch: 42, listingHash: null });
+    for (const r of RING) expect(await agents.get(r.name)!.answerProposals()).toEqual([{ termsHash: created.termsHash, action: "signed" }]);
+    const [ready] = await m.book.proposals(acct("translator"), "ready");
+    expect(ready).toMatchObject({ termsHash: created.termsHash, status: "ready", missing: [] });
+    await expect(m.book.postBundleProposal(ringTerms(41))).rejects.toMatchObject({ code: "epoch_not_open" });
+  });
+
   it("TC-AG-012-04 epoch bukan epoch open ditolak", async () => {
     const { m, agents } = await setup();
     for (const r of RING) await agents.get(r.name)!.postIntent(r.offer, r.need);
