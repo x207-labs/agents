@@ -263,8 +263,20 @@ export class PolicyAgent {
     return results;
   }
 
-  /** Jawab penawaran di kotak masuk menurut kebijakan: terima, tawar balik, atau tolak. */
-  async handleInbox(): Promise<StepResult[]> {
+  /**
+   * Kirim penawaran ronde 1 dari ajakan pencari (SV-015): nilai = nilai listing, cara dan jumlah dari rencana pencari. Hanya agent
+   * yang sudah opt-in yang memanggil ini; penawaran ditandatangani agent sendiri.
+   */
+  async bidFromReferral(plan: { listing: ListingView; mode: "pay" | "barter"; value: string; quantity: number }): Promise<StepResult> {
+    const offer = await this.#postOffer(plan.listing, 1, plan.mode, plan.value, plan.quantity);
+    return { kind: "bid", listingHash: plan.listing.listingHash, offerHash: offer.offerHash, mode: plan.mode, value: plan.value };
+  }
+
+  /**
+   * Jawab penawaran di kotak masuk menurut kebijakan: terima, tawar balik, atau tolak. `referral` menyebut pencari yang membawa
+   * penawaran itu (bila ada); jatahnya menjadi leg di bundle yang sama.
+   */
+  async handleInbox(options: { referral?: (offer: OfferView) => { searcher: string; searcherShareBps: number } | undefined } = {}): Promise<StepResult[]> {
     const results: StepResult[] = [];
     for (const incoming of await this.book.inbox(this.identity.accountId)) {
       const [view] = (await this.book.listings({ status: "all" })).filter((l) => l.listingHash === incoming.listingHash);
@@ -282,7 +294,10 @@ export class PolicyAgent {
         const sent = await this.#postOffer(view, incoming.round + 1, incoming.mode, decision.value, incoming.quantity, incoming.offerHash);
         results.push({ kind: "countered", listingHash: view.listingHash, offerHash: sent.offerHash, round: sent.round, value: decision.value });
       } else {
-        results.push({ kind: "accepted", listingHash: view.listingHash, offerHash: incoming.offerHash, result: await this.#accept(view.listingHash, incoming.offerHash) });
+        results.push({
+          kind: "accepted", listingHash: view.listingHash, offerHash: incoming.offerHash,
+          result: await this.#accept(view.listingHash, incoming.offerHash, options.referral?.(incoming)),
+        });
       }
     }
     return results;
@@ -335,12 +350,13 @@ export class PolicyAgent {
     return answers;
   }
 
-  async #accept(listingHashHex: string, offerHashHex: string): Promise<AcceptResult> {
+  async #accept(listingHashHex: string, offerHashHex: string, referral?: { searcher: string; searcherShareBps: number }): Promise<AcceptResult> {
     const account = this.identity.accountId;
-    const preview = await this.book.previewAccept(listingHashHex, offerHashHex, { account });
-    if (!preview.bundle) return this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch });
+    const seeker = referral ? { searcher: referral.searcher, searcherShareBps: referral.searcherShareBps } : {};
+    const preview = await this.book.previewAccept(listingHashHex, offerHashHex, { account, ...seeker });
+    if (!preview.bundle) return this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch, ...seeker });
     if (termsHash(preview.bundle.terms) !== preview.bundle.termsHash) throw new Error("terms_hash dari server tidak cocok dengan syarat bundle");
     const { signature } = signBundle(preview.bundle.terms, account, this.identity.voucherSecretKey);
-    return this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch, signature });
+    return this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch, signature, ...seeker });
   }
 }
