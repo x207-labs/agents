@@ -142,6 +142,10 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-016 negosiasi dua agent lewat buku", () 
     expect(await budi.signProposals()).toEqual([{ termsHash: expect.any(String), action: "signed" }]);
     const [proposal] = await m.book.proposals(acct("summarizer"), "ready");
     expect(proposal).toMatchObject({ status: "ready", missing: [], listingHash: hash });
+    // nilai kesepakatan 90 (bukan 100 di listing): Budi membayar 90 ke Andi; Andi membayar 100 + cashback 9 (diskon 10% dari 90)
+    const leg = (payer: string, payee: string) => proposal!.terms.legs.find((l) => l.payer === acct(payer) && l.payee === acct(payee))?.max_amount;
+    expect(leg("summarizer", "translator")).toBe(C(90));
+    expect(leg("translator", "summarizer")).toBe(C(109));
   });
 
   it("TC-AG-016-02 tawaran jauh di bawah batas bawah ditolak penjual tanpa tawar balik", async () => {

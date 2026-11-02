@@ -311,7 +311,8 @@ export class PolicyAgent {
       };
       const searcher = proposal.participants.find((p) => p !== view.account && p !== accepted.counterparty);
       const leg = searcher ? proposal.terms.legs.find((l) => l.payee === searcher) : undefined;
-      const listed = BigInt(view.offer.value);
+      // Jatah pencari dihitung dari nilai kesepakatan (Offer.value penawaran yang diterima).
+      const listed = BigInt(accepted.value);
       const base = leg ? Number((BigInt(leg.max_amount) * BPS) / listed) : 0;
       // Pembulatan ke bawah saat server menghitung jatah: coba bps terdekat yang menghasilkan jumlah leg yang sama.
       const candidates = leg ? [base, base + 1] : [0];
