@@ -3,7 +3,7 @@
 // agent tidak pernah mengirim transaksi, jadi argumen `post_intent` dikembalikan ke pemanggil yang memegang pengirim transaksi.
 import {
   bundleParticipants, intentHash, intentHashBase58, signBundle, signIntent, termsHash,
-  type BarterIntent, type BarterSide, type BundleTerms,
+  type BarterIntent, type BarterSide, type BundleTerms, type Listing, type Offer,
 } from "@x207/core";
 import type { AgentIdentity } from "./identity.ts";
 
@@ -51,6 +51,51 @@ export type BundleProposalView = {
   listingHash: string | null;
 };
 
+export type ListingView = {
+  listingHash: string;
+  account: string;
+  offer: { assetType: string; assetClass: string; quantity: number; value: string };
+  want: { assetType: string; assetClass: string; quantity: number; value: string };
+  terms: string;
+  detail: string;
+  expiresAt: string;
+  discountBps: number;
+  acceptPayment: boolean;
+  discoverable: boolean;
+  nonce: string;
+  status: string;
+};
+
+export type OfferView = {
+  offerHash: string;
+  listingHash: string;
+  proposer: string;
+  counterparty: string;
+  awaiting: string;
+  round: number;
+  mode: "pay" | "barter";
+  value: string;
+  quantity: number;
+  deliverBy: string;
+  status: string;
+};
+
+export type AcceptPreview = {
+  kind: "payment" | "bundle";
+  epoch: number;
+  mode: "pay" | "barter";
+  discountValue: string;
+  searcherValue: string;
+  breakdown: Record<string, string>;
+  bundle: { termsHash: string; message: string; recipient: string; terms: BundleTerms; participants: string[] } | null;
+  payment: { payer: string; payee: string; amount: string } | null;
+};
+
+export type AcceptResult = {
+  match: { kind: "payment" | "bundle"; termsHash: string | null };
+  result: { kind: "payment"; payer: string; payee: string; amount: string } | { kind: "bundle"; proposal: BundleProposalView };
+};
+
 export type EpochSummary = { epoch: number; phase: string };
 
 /** Klien tipis atas read API dan buku marketplace; satu instance per lingkaran. */
@@ -96,6 +141,28 @@ export class BookClient {
   }
   signProposal(termsHash: string, account: string, signature: string): Promise<BundleProposalView> {
     return this.post<BundleProposalView>(`/bundle-proposals/${termsHash}/signatures`, { account, signature });
+  }
+  postListing(listing: Listing, signature: string): Promise<ListingView> {
+    return this.post<ListingView>("/listings", { listing, signature });
+  }
+  async listings(query: Record<string, string> = { status: "open" }): Promise<ListingView[]> {
+    return (await this.get<{ items: ListingView[] }>(`/listings?${new URLSearchParams(query).toString()}`)).items;
+  }
+  async offersOf(listingHash: string): Promise<OfferView[]> {
+    return (await this.get<{ items: OfferView[] }>(`/listings/${listingHash}/offers`)).items;
+  }
+  /** Kotak masuk: penawaran yang menunggu jawaban `account`. */
+  async inbox(account: string): Promise<OfferView[]> {
+    return (await this.get<{ items: OfferView[] }>(`/offers?account=${encodeURIComponent(account)}&box=inbox`)).items;
+  }
+  postOffer(listingHash: string, offer: Offer, signature: string, inReplyTo?: string): Promise<OfferView> {
+    return this.post<OfferView>(`/listings/${listingHash}/offers`, { offer, signature, ...(inReplyTo ? { inReplyTo } : {}) });
+  }
+  previewAccept(listingHash: string, offerHash: string, body: { account: string; searcher?: string; searcherShareBps?: number }): Promise<AcceptPreview> {
+    return this.post<AcceptPreview>(`/listings/${listingHash}/offers/${offerHash}/preview`, body);
+  }
+  accept(listingHash: string, offerHash: string, body: { account: string; signature?: string; epoch?: number; searcher?: string; searcherShareBps?: number }): Promise<AcceptResult> {
+    return this.post<AcceptResult>(`/listings/${listingHash}/offers/${offerHash}/accept`, body);
   }
   /** Epoch `open` saat ini, atau `null` bila tidak ada. */
   async openEpoch(): Promise<number | null> {
