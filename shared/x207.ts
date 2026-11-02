@@ -32,6 +32,8 @@ export function createAgentBuyer(identity: AgentIdentity, options: BuyerOptions 
   const client = new X207PaymentClient({
     payer: identity.accountId,
     secretKey: identity.voucherSecretKey,
+    // AG-008: kebijakan belanja pemilik jadi pagar klien; voucher di atas batas tidak pernah ditandatangani
+    spendLimit: { maxPerCall: identity.policy.maxPerCall, maxPerEpoch: identity.policy.maxPerEpoch },
     ...(options.bundleFor ? { bundleFor: options.bundleFor } : {}),
     headroom: headroomFromRpc({
       ...(options.rpcUrls ? { rpcUrls: options.rpcUrls } : {}),
