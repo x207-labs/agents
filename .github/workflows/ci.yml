@@ -10,4 +10,8 @@ permissions:
 
 jobs:
   ci:
-    uses: x207-labs/x207/.github/workflows/ci-node.yml@520bd51b764feadccdb546d3af4ef3d3a2034c0d # OP-001
+    uses: x207-labs/x207/.github/workflows/ci-node.yml@aee1de79e1831b28af6ee6912c8af07c5b65618d # OP-002
+    with:
+      sdk-ref: 24df15dac523453e8fca7c6151b89b7c7123cac6
+    secrets:
+      sdk-token: ${{ secrets.X207_CHECKOUT_TOKEN }}
