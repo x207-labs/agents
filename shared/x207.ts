@@ -23,6 +23,8 @@ export function createSellerPaywall(spec: AgentSpec, config: SellerConfig): Payw
 export type BuyerOptions = {
   rpcUrls?: readonly string[];
   fetch?: typeof fetch;
+  /** Leg bundle F5 (SD-048): `bundle_id` untuk pembayaran ke `payee` di `epoch`, atau `undefined` bila bukan leg. */
+  bundleFor?: (payee: string, epoch: number) => number | undefined;
 };
 
 /** `fetch` yang membayar 402 dengan voucher bertanda tangan kunci voucher agent; tidak pernah mengirim transaksi. */
@@ -30,6 +32,7 @@ export function createAgentBuyer(identity: AgentIdentity, options: BuyerOptions 
   const client = new X207PaymentClient({
     payer: identity.accountId,
     secretKey: identity.voucherSecretKey,
+    ...(options.bundleFor ? { bundleFor: options.bundleFor } : {}),
     headroom: headroomFromRpc({
       ...(options.rpcUrls ? { rpcUrls: options.rpcUrls } : {}),
       ...(options.fetch ? { fetch: options.fetch } : {}),

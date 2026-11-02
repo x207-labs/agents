@@ -80,6 +80,18 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need dan usulan bundle"
     expect(answers.find((a) => a.termsHash === underpaid)).toEqual({ termsHash: underpaid, action: "rejected", reason: "underpaid" });
   });
 
+  it("TC-AG-012-05 signTerms: tanda tangan untuk syarat yang cocok, null untuk yang tidak (permintaan langsung solver)", async () => {
+    const { m, agents } = await setup();
+    for (const r of RING) await agents.get(r.name)!.postIntent(r.offer, r.need);
+    const translator = agents.get("translator")!;
+    const good = await translator.signTerms(ringTerms());
+    expect(good).toMatchObject({ account: acct("translator") });
+    const { verifyBundleSignature } = await import("@x207/core");
+    expect(verifyBundleSignature(ringTerms(), good!.signature, m.identities.translator!.voucherPublicKey)).toBe(true);
+    expect(await translator.signTerms(ringTerms(42, [120, 100, 100]))).toBeNull(); // membayar lebih dari kebutuhan
+    expect(await translator.signTerms(ringTerms(41))).toBeNull(); // bukan epoch open
+  });
+
   it("TC-AG-012-04 epoch bukan epoch open ditolak", async () => {
     const { m, agents } = await setup();
     for (const r of RING) await agents.get(r.name)!.postIntent(r.offer, r.need);

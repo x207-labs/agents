@@ -3,7 +3,7 @@
 // agent tidak pernah mengirim transaksi, jadi argumen `post_intent` dikembalikan ke pemanggil yang memegang pengirim transaksi.
 import {
   bundleParticipants, intentHash, intentHashBase58, signBundle, signIntent, termsHash,
-  type BarterIntent, type BarterSide, type BundleTerms, type Listing, type Offer,
+  type BarterIntent, type BarterSide, type BundleSignature, type BundleTerms, type Listing, type Offer,
 } from "@x207/core";
 import type { AgentIdentity } from "./identity.ts";
 
@@ -266,6 +266,18 @@ export class BarterAgent {
   async evaluate(proposal: BundleProposalView): Promise<Evaluation> {
     const openEpoch = await this.book.openEpoch();
     return evaluateProposal({ account: this.identity.accountId, proposal, intents: this.intents, now: this.#now(), openEpoch });
+  }
+
+  /**
+   * Permintaan tanda tangan dari solver (SV-011): syarat bundle datang langsung, bukan lewat buku. Agent menandatangani `terms_hash`
+   * hanya bila syaratnya cocok dengan intent terbukanya (aturan sama dengan `answerProposals`); selain itu `null`.
+   */
+  async signTerms(terms: BundleTerms): Promise<BundleSignature | null> {
+    const openEpoch = await this.book.openEpoch();
+    const verdict = evaluateProposal({
+      account: this.identity.accountId, proposal: { termsHash: termsHash(terms), terms }, intents: this.intents, now: this.#now(), openEpoch,
+    });
+    return verdict.ok ? signBundle(terms, this.identity.accountId, this.identity.voucherSecretKey) : null;
   }
 
   /** Ambil usulan yang menunggu tanda tangan agent ini; tandatangani yang cocok dengan intent, tolak sisanya. */
