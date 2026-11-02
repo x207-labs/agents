@@ -12,6 +12,6 @@ jobs:
   ci:
     uses: x207-labs/x207/.github/workflows/ci-node.yml@555d66acb3f3e17b72a39347c3be85e4d3a36e47 # OP-002, header restored
     with:
-      sdk-ref: 8ffad8e80cbba96f946083195fc03e5397a18ae3
+      sdk-ref: 57f175b7993d485ed7c96469a9e050bc5b77599c
     secrets:
       sdk-token: ${{ secrets.X207_CHECKOUT_TOKEN }}
