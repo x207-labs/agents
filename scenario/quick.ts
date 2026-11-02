@@ -8,13 +8,15 @@ import type { AgentIdentity } from "../shared/identity.ts";
 import { SeekerBot, type SeekerPlan, type VisitedAgent } from "../shared/seeker.ts";
 
 const CREDIT = 1_000_000;
-const unit = (credits: number): string => String(credits * CREDIT);
+const unit = (credits: number): string => String(Math.round(credits * CREDIT));
 
 export const QUICK_PARAMS = { value: 100, discountBps: 1000, searcherShareBps: 300 } as const;
 
-const andiPolicy = (over: Partial<BarterPolicy>): BarterPolicy => ({
+export type QuickParams = { value: number; discountBps: number; searcherShareBps: number };
+
+const andiPolicy = (params: QuickParams, over: Partial<BarterPolicy>): BarterPolicy => ({
   ...DEFAULT_BARTER_POLICY,
-  discountBps: QUICK_PARAMS.discountBps,
+  discountBps: params.discountBps,
   discoverable: true,
   ...over,
 });
@@ -33,16 +35,19 @@ export async function runQuickBarter(args: {
   contractId: string;
   identities: { seller: AgentIdentity; payer: AgentIdentity; barterer: AgentIdentity; seeker: AgentIdentity; bystander: AgentIdentity };
   now: () => number;
+  /** Parameter hitungan (default contoh note F9: 100, 1000 bps, 300 bps); nilai dalam credit utuh. */
+  params?: QuickParams;
 }): Promise<QuickReport> {
   const { book, identities, contractId, now } = args;
+  const params = args.params ?? QUICK_PARAMS;
   const make = (identity: AgentIdentity, policy: BarterPolicy) => new PolicyAgent({ identity, book, contractId, policy, now });
-  const value = QUICK_PARAMS.value;
-  const payListing = andiPolicy({
+  const value = params.value;
+  const payListing = andiPolicy(params, {
     acceptPayment: true,
     holdings: [{ assetType: "service:translate-calls", assetClass: "D", quantity: 10, unitValue: unit(value / 10) }],
     needs: [{ assetType: "service:summarize-calls", assetClass: "D", quantity: 10, maxUnitValue: unit(value / 10) }],
   });
-  const barterListing = andiPolicy({
+  const barterListing = andiPolicy(params, {
     acceptPayment: false,
     holdings: [{ assetType: "service:translate-batch", assetClass: "D", quantity: 10, unitValue: unit(value / 10) }],
     needs: [{ assetType: "service:scrape-calls", assetClass: "D", quantity: 10, maxUnitValue: unit(value / 10) }],
@@ -61,14 +66,14 @@ export async function runQuickBarter(args: {
     // tidak opt-in: tidak pernah dikunjungi
     { account: identities.bystander.accountId, optIn: false, idle: true, canPay: true, offers: [] },
   ];
-  const bot = new SeekerBot({ seeker: identities.seeker.accountId, searcherShareBps: QUICK_PARAMS.searcherShareBps, maxOffersPerAgent: 1, periodSeconds: 3600 });
+  const bot = new SeekerBot({ seeker: identities.seeker.accountId, searcherShareBps: params.searcherShareBps, maxOffersPerAgent: 1, periodSeconds: 3600 });
   const plans: SeekerPlan[] = bot.plan(await book.listings({ status: "open" }), visited, now());
 
   const referrals = new Map<string, { searcher: string; searcherShareBps: number }>();
   for (const plan of plans) {
     const agent = plan.to === identities.payer.accountId ? budi : citra;
     const bid = await agent.bidFromReferral(plan);
-    if (bid.kind === "bid") referrals.set(bid.offerHash, { searcher: identities.seeker.accountId, searcherShareBps: QUICK_PARAMS.searcherShareBps });
+    if (bid.kind === "bid") referrals.set(bid.offerHash, { searcher: identities.seeker.accountId, searcherShareBps: params.searcherShareBps });
     bot.record(plan.to, now());
   }
   await andiPay.handleInbox({ referral: (offer) => referrals.get(offer.offerHash) });
