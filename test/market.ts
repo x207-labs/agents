@@ -18,6 +18,8 @@ const load = (path: string): Promise<any> => import(/* @vite-ignore */ pathToFil
 
 export type MarketBook = {
   book: BookClient;
+  /** URL dasar read API. */
+  url: string;
   identities: Record<string, AgentIdentity>;
   db: any;
   /** Waktu server dalam ms; geser untuk menguji kedaluwarsa. */
@@ -54,6 +56,7 @@ export async function startMarketBook(names: readonly string[], options: { now?:
   const server = await fixtures.listen({ db, now: () => clock.now, extraRoutes: marketplace.marketplaceRoutes(db) });
   return {
     book: new BookClient({ baseUrl: server.url, circleId: CIRCLE_ID }),
+    url: server.url,
     identities,
     db,
     clock,
