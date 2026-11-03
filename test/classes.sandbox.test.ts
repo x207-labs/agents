@@ -26,7 +26,7 @@ describe.skipIf(!sandboxAvailable || !existsSync(MOCK_RWA_WASM))("AG-022 one ass
     // the registry: the whole catalog, through the same function as the script
     const registered = await registerCatalog({
       view: chain,
-      send: async ({ methodName, args }: { methodName: string; args: object }) => {
+      send: async ({ methodName, args }: { methodName: string; args: Record<string, unknown> }) => {
         const r = await dao.call({ receiverId: fx.circle.accountId, methodName, args, deposit: 0n, gas: 100_000_000_000_000n }, "EXECUTED_OPTIMISTIC");
         if (r.failures.length > 0) throw new Error(r.failures.join("; "));
         return r.hash;
