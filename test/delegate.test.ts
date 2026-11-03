@@ -36,7 +36,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-029 delegate: paid per vote on the manda
   async function start() {
     txs.clear();
     market = await startMarket(["owner", "delegate"], {
-      chainView: async (_account: string, method: string, args: { id: number }) => (method === "get_proposal" ? (proposals.get(args.id) ?? null) : null),
+      chainView: async (_account: string, method: string, args: { id: number }) => (method === "get_proposal" ? (proposals.get(args.id) ?? null) : method === "get_policy" ? { roles: [] } : null), // the backend asks the DAO for its policy when it takes the order
       claimRpc: { tx: async (hash: string) => txs.get(hash) ?? null, blockTimestampNs: async () => blockNs(() => market) },
     });
     const actor = (name: string) => ({ account: acct(name), secretKey: market.keys[name].secretKey, publicKey: market.keys[name].publicKey });
@@ -122,7 +122,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-029 delegate: paid per vote on the manda
     const early = { tx: async (h: string) => txs.get(h) ?? null, blockTimestampNs: async () => BigInt(market.clock.now - 3_600_000) * 1_000_000n };
     await market.srv.close();
     market.db.close();
-    market = await startMarket(["owner", "delegate"], { chainView: async () => ({ kind: { Transfer: {} } }), claimRpc: early });
+    market = await startMarket(["owner", "delegate"], { chainView: async (_a: string, method: string) => (method === "get_policy" ? { roles: [] } : { kind: { Transfer: {} } }), claimRpc: early });
     const owner2 = { account: acct("owner"), secretKey: market.keys.owner.secretKey, publicKey: market.keys.owner.publicKey };
     const delegate2 = { account: acct("delegate"), secretKey: market.keys.delegate.secretKey, publicKey: market.keys.delegate.publicKey };
     const book2 = new OrderBook(market.srv.url, CIRCLE_ID, CONTRACT, () => Math.floor(market.clock.now / 1000));
@@ -136,8 +136,17 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-029 delegate: paid per vote on the manda
     const owner3 = { account: acct("owner"), secretKey: market.keys.owner.secretKey, publicKey: market.keys.owner.publicKey };
     const delegate3 = { account: acct("delegate"), secretKey: market.keys.delegate.secretKey, publicKey: market.keys.delegate.publicKey };
     const book3 = new OrderBook(market.srv.url, CIRCLE_ID, CONTRACT, () => Math.floor(market.clock.now / 1000));
-    const hash3 = await book3.open(doc, owner3, delegate3, mandate);
-    expect(await code(book3.claim(hash3, TX(1), delegate3))).toBe("503 claim_rpc_unavailable");
+    // a backend with no view of the chain refuses the order itself (it cannot ask the DAO for its policy)
+    expect(await code(book3.open(doc, owner3, delegate3, mandate))).toBe("503 claim_rpc_unavailable");
+    // a backend with the view but no RPC for claims takes the order and cannot check a claim
+    await market.srv.close();
+    market.db.close();
+    market = await startMarket(["owner", "delegate"], { chainView: async (_a: string, method: string) => (method === "get_policy" ? { roles: [] } : null) });
+    const owner4 = { account: acct("owner"), secretKey: market.keys.owner.secretKey, publicKey: market.keys.owner.publicKey };
+    const delegate4 = { account: acct("delegate"), secretKey: market.keys.delegate.secretKey, publicKey: market.keys.delegate.publicKey };
+    const book4 = new OrderBook(market.srv.url, CIRCLE_ID, CONTRACT, () => Math.floor(market.clock.now / 1000));
+    const hash4 = await book4.open(doc, owner4, delegate4, mandate);
+    expect(await code(book4.claim(hash4, TX(1), delegate4))).toBe("503 claim_rpc_unavailable");
     void hash;
   });
 
