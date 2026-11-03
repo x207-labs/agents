@@ -50,7 +50,7 @@ describe.skipIf(!ready)("AG-023 ten kinds of batch 1 in near-sandbox", () => {
       expect((await account.call({ receiverId: account.accountId, methodName: "new", args: {}, deposit: 0n })).failures).toEqual([]);
       return account;
     };
-    const call = async (on: SandboxAccount, methodName: string, args: object) => expect((await on.call({ receiverId: on.accountId, methodName, args, deposit: 0n })).failures).toEqual([]);
+    const call = async (on: SandboxAccount, methodName: string, args: Record<string, unknown>) => expect((await on.call({ receiverId: on.accountId, methodName, args, deposit: 0n })).failures).toEqual([]);
     const nft = await deploy("nft", MOCK_NFT_WASM);
     for (const id of ["t1", "t2", "t3", "t4", "t5", "t6"]) await call(nft, "nft_mint", { token_id: id, owner_id: grantor.account.accountId });
     const tokens = { ft: await deploy("tokft", MOCK_RWA_WASM), rwa: await deploy("tokrwa", MOCK_RWA_WASM), lst: await deploy("toklst", MOCK_RWA_WASM) };
