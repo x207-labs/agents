@@ -138,9 +138,8 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-025 invoice and installments through the
     expect(await code(book.catchUp(requested.invoiceHash, 1, actor("maker"), { seq: 0, cumulativeAmount: "0" }))).not.toBe("no error");
   });
 
-  // Main C is fixing this: an installment paid by a voucher with seq 2 or more whose cumulative already holds it counts as registered (spec 5e). `it.fails` until the fix is in the
-  // backend; when it turns red the fix is there and this becomes a plain `it`.
-  it.fails("TC-AG-025-08 an installment paid through an ordinary voucher of seq 2 whose cumulative holds it is registered", async () => {
+  // An installment paid by a voucher with seq 2 or more whose cumulative already holds it counts as registered (spec 5e; fixed in the backend by Main C, so this was `it.fails` until then).
+  it("TC-AG-025-08 an installment paid through an ordinary voucher of seq 2 whose cumulative holds it is registered", async () => {
     const { book, actor, chain, doc } = await start();
     const requested = await book.request(doc("supplier", "maker", { id: "INV-2026-006", amount: credit(30) }), 1, actor("supplier"));
     await book.approve(requested.invoiceHash, actor("maker"));
