@@ -53,9 +53,9 @@ describe("AG-030 one-time codes: mock book and mock issuer", () => {
     expect(served.disputeUntil).toBe(book.at() + 3600);
     expect(issuer.asked).toEqual([GIFT]); // asked once, before the key left
     expect(served.voucher).toBeUndefined();
-    const received = await receiveCode(book, buyer, bought.purchaseId, seller.publicKey, sources);
+    const received = await receiveCode(book, buyer, bought.purchaseId, seller.publicKey, sources, { doc: sold.doc, redeem: async (c) => issuer.redeem(c) });
     expect(received).toMatchObject({ outcome: "confirmed", code: GIFT, status: "confirmed" });
-    expect(issuer.redeem(received.code!)).toBe(true); // the buyer redeems it at the issuer
+    expect(issuer.redeem(received.code!)).toBe(false); // the buyer agent already redeemed it before it confirmed
     expect((await book.get(bought.purchaseId)).voucher).toMatchObject({ payer: buyer.account, payee: seller.account, cumulativeAmount: credit(5) });
     const stored = book.dump();
     expect(stored).not.toContain(GIFT);
@@ -82,19 +82,21 @@ describe("AG-030 one-time codes: mock book and mock issuer", () => {
     expect(await errCode(book.notice(again.purchaseId, { sealed_key: "00".repeat(80), cipher_hash: "a".repeat(64) }, "sig"))).toBe("code_not_checked");
   });
 
-  it("TC-AG-030-03 a code that cannot be checked is limited to 20 credit: above it the SDK refuses without a bond and nothing is posted; with a bond or a checkable issuer it passes", async () => {
+  it("TC-AG-030-03 a code that cannot be checked is limited to 20 credit and a checkable one to 100: above it the SDK refuses and nothing is posted; no arbiter is accepted", async () => {
     const { book, issuer, actor, expiresAt } = setup();
     const seller = actor("andi");
     issuer.issue(GIFT);
     const base = { code: GIFT, issuer: "none", verifiable: false, nonce: "c3", expiresAt };
     expect(await errCode(listCode(book, seller, { ...base, price: credit(25) }))).toBe("code_over_limit_unbonded");
     expect(await errCode(listCode(book, seller, { ...base, price: credit(20) }))).toBe("no error"); // at the limit
-    expect(await errCode(listCode(book, seller, { ...base, code: "SECOND-CODE-1234-ZZ", price: credit(25), arbiter: "arbiter.near", nonce: "c3b" }))).toBe("no error"); // with a bond
-    expect(await errCode(listCode(book, seller, { ...base, issuer: "shop.example", verifiable: true, code: "THIRD-CODE-5678-YY", price: credit(25), nonce: "c3c" }))).toBe("no error"); // checkable
+    expect(await errCode(listCode(book, seller, { ...base, issuer: "shop.example", verifiable: true, code: "THIRD-CODE-5678-YY", price: credit(25), nonce: "c3c" }))).toBe("no error"); // checkable: capped at 100
+    expect(await errCode(listCode(book, seller, { ...base, issuer: "shop.example", verifiable: true, code: "SECOND-CODE-1234-ZZ", price: credit(101), nonce: "c3b" }))).toBe("code_over_limit_unbonded");
     // the book enforces the same rule for a listing that came around the SDK
     const forged = await listCode(book, seller, { ...base, code: "FOURTH-CODE-9012-XX", price: credit(5), nonce: "c3d" });
     const over = { ...forged.listing, offer: { ...forged.listing.offer, value: credit(25) }, nonce: "c3e", detail: JSON.stringify({ ...JSON.parse(forged.listing.detail), value: credit(25) }) };
-    expect(await errCode(book.postListing(over, seller.secretKey))).toBe("code_value_over_cap");
+    expect(await errCode(book.postListing(over, seller.secretKey))).toBe("code_over_limit_unbonded");
+    const withArbiter = { ...forged.listing, nonce: "c3f", detail: JSON.stringify({ ...JSON.parse(forged.listing.detail), arbiter: "arbiter.near" }) };
+    expect(await errCode(book.postListing(withArbiter, seller.secretKey))).toBe("arbiter_not_supported");
   });
 
   it("TC-AG-030-04 the same code listed twice with another salt is not found by hash, but the issuer stops the second sale: after the first buyer redeemed it, the check of the second says used", async () => {
@@ -108,8 +110,8 @@ describe("AG-030 one-time codes: mock book and mock issuer", () => {
     const ref1: ContentRef = { kind: "https", ref: "https://store.example.com/d1.bin" };
     publish(ref1.ref, one.ciphertext);
     await serveCode(book, seller, p1.purchaseId, one, ref1, first);
-    const got = await receiveCode(book, first, p1.purchaseId, seller.publicKey, sources);
-    expect(issuer.redeem(got.code!)).toBe(true);
+    const got = await receiveCode(book, first, p1.purchaseId, seller.publicKey, sources, { doc: one.doc, redeem: async (c) => issuer.redeem(c) });
+    expect(got.outcome).toBe("confirmed"); // the first buyer redeemed it and then confirmed
     const p2 = await buyCode(book, second, two, 42, { seq: 0, cumulative: "0" });
     const ref2: ContentRef = { kind: "https", ref: "https://store.example.com/d2.bin" };
     publish(ref2.ref, two.ciphertext);
@@ -131,6 +133,46 @@ describe("AG-030 one-time codes: mock book and mock issuer", () => {
     const noIssuer = { ...sold.listing, nonce: "e3", detail: JSON.stringify({ ...JSON.parse(sold.listing.detail), issuer: "nobody.example" }) };
     expect(await errCode(book.postListing(noIssuer, seller.secretKey))).toBe("code_issuer_unknown");
     expect(await errCode(book.check(sold.listingHash, seller, GIFT, salt))).toBe("no error");
+  });
+});
+
+describe("AG-030 the buyer agent does not pay before it has tried the code (batch 6)", () => {
+  async function served() {
+    const { book, issuer, actor, sources, publish, expiresAt } = setup();
+    const [seller, buyer] = [actor("andi"), actor("budi")];
+    issuer.issue(GIFT);
+    const sold = await listCode(book, seller, { code: GIFT, issuer: "shop.example", verifiable: true, price: credit(5), nonce: "f1", expiresAt });
+    const bought = await buyCode(book, buyer, sold, 42, { seq: 0, cumulative: "0" });
+    const ref: ContentRef = { kind: "https", ref: "https://store.example.com/f1.bin" };
+    publish(ref.ref, sold.ciphertext);
+    await serveCode(book, seller, bought.purchaseId, sold, ref, buyer);
+    return { book, issuer, seller, buyer, sold, bought, sources, actor };
+  }
+
+  it("TC-AG-030-13 [B6-F3] without a redeemer the agent returns the code and confirms nothing: silence confirms after the window", async () => {
+    const { book, seller, buyer, sold, bought, sources } = await served();
+    const received = await receiveCode(book, buyer, bought.purchaseId, seller.publicKey, sources, { doc: sold.doc });
+    expect(received).toMatchObject({ outcome: "waiting", code: GIFT });
+    expect((await book.get(bought.purchaseId)).status).toBe("key_released");
+    expect((await book.get(bought.purchaseId)).voucher).toBeUndefined();
+  });
+
+  it("TC-AG-030-14 [B6-F3] a code that the issuer does not accept at the redeem is not confirmed and the voucher stays held", async () => {
+    const { book, issuer, seller, buyer, sold, bought, sources } = await served();
+    issuer.markUsed(GIFT); // somebody used it between the check and the delivery
+    const received = await receiveCode(book, buyer, bought.purchaseId, seller.publicKey, sources, { doc: sold.doc, redeem: async (c) => issuer.redeem(c) });
+    expect(received).toMatchObject({ outcome: "refused", reason: expect.stringContaining("issuer did not accept") });
+    expect((await book.get(bought.purchaseId)).status).toBe("key_released");
+    expect((await book.get(bought.purchaseId)).voucher).toBeUndefined();
+  });
+
+  it("TC-AG-030-15 [B6-F4] a delivery that is not for the document of the listing the buyer looked at is refused before anything is tried", async () => {
+    const { book, seller, buyer, sold, bought, sources } = await served();
+    let tried = false;
+    const other = { ...sold.doc, nonce: "other" };
+    const received = await receiveCode(book, buyer, bought.purchaseId, seller.publicKey, sources, { doc: other, redeem: async () => { tried = true; return true; } });
+    expect(received).toMatchObject({ outcome: "refused", reason: "wrong_purchase" });
+    expect(tried).toBe(false);
   });
 });
 

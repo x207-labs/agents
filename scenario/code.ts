@@ -6,7 +6,7 @@
 // Bagian kedua: proxy rahasia (`SecretProxy`, BE-070) untuk kunci API yang dijual per panggilan: kunci asli hanya ada di proxy milik pemberi, tagihan satu unit per panggilan yang
 // berhasil, dan hitungan pembeli (`BuyerMeter`, SD-068) harus sama dengan tagihan.
 import {
-  CODE_DISPUTE_WINDOW_SECONDS, checkCodeDocument, codeCommitment, codeDocumentHash, codeNeedsBond, codeResource, contentHash, createCodeRelease, encryptCode, fetchCiphertext, listingHash,
+  CODE_DISPUTE_WINDOW_SECONDS, checkCodeDocument, codeCommitment, codeDocumentHash, codeOverLimit, codeResource, contentHash, createCodeRelease, encryptCode, fetchCiphertext, listingHash,
   signListing, signVoucher, verifyCodeDelivery, verifyListingSignature, verifyVoucher, voucherPublicKey,
   type CodeCheck, type CodeDocument, type CodeIssuer, type ContentRef, type ContentSource, type Listing, type UnsignedVoucher, type Voucher, type VoucherSecretKey,
 } from "@x207/core";
@@ -101,7 +101,9 @@ export class MockCodeBook implements CodeBookApi {
     if (detail.kind !== "code" || typeof detail.code_commitment !== "string" || typeof detail.issuer !== "string") throw new BookError(400, "code_format_invalid", "not a code listing");
     if (detail.issuer !== "none" && !this.issuers[detail.issuer]) throw new BookError(400, "code_issuer_unknown", detail.issuer);
     const verifiable = detail.issuer !== "none" && detail.verifiable === true;
-    if (codeNeedsBond({ value: listing.offer.value, verifiable, arbiter: detail.arbiter ?? null })) throw new BookError(400, "code_value_over_cap", "not checkable, above 20 credit, no bond");
+    // like the real book (ADR-48 points 6 and 7): no arbiter, and a cap by kind (20 credit unchecked, 100 credit checkable) that nothing lifts
+    if (detail.arbiter !== undefined && detail.arbiter !== null) throw new BookError(400, "arbiter_not_supported", "no bond is locked for a code sale");
+    if (codeOverLimit({ value: listing.offer.value, verifiable })) throw new BookError(400, "code_over_limit_unbonded", "the value is above the cap of its kind");
     const hash = listingHash(listing);
     this.listings.set(hash, { listing, detail: { ...detail, verifiable } });
     return { listingHash: hash };
@@ -205,16 +207,16 @@ export type SoldCode = { listing: Listing; listingHash: string; doc: Required<Co
 
 /** Penjual menyiapkan kode: salt, enkripsi, dokumen (batas 20 credit dijaga SDK), dan listing bertanda tangan. Melempar `CodeError` dari SDK sebelum apa pun dikirim. */
 export async function listCode(book: CodeBookApi, seller: CodeActor, o: {
-  code: string; issuer: string; verifiable: boolean; price: string; arbiter?: string | null; nonce: string; expiresAt: number; assetType?: string
+  code: string; issuer: string; verifiable: boolean; price: string; nonce: string; expiresAt: number; assetType?: string
 }): Promise<SoldCode> {
   const { ciphertext, key, code_commitment, salt } = encryptCode(o.code);
-  const doc = checkCodeDocument({ circle: book.contract, seller: seller.account, code_commitment, issuer: o.issuer, value: o.price, verifiable: o.verifiable, arbiter: o.arbiter ?? null, nonce: o.nonce });
+  const doc = checkCodeDocument({ circle: book.contract, seller: seller.account, code_commitment, issuer: o.issuer, value: o.price, verifiable: o.verifiable, arbiter: null, nonce: o.nonce });
   const docHash = codeDocumentHash(doc);
   const listing: Listing = {
     circle: book.contract, account: seller.account,
     offer: { asset_type: o.assetType ?? "code:gift", asset_class: "D", quantity: 1, value: o.price },
     want: { asset_type: "usdc", asset_class: "A", quantity: 1, value: o.price },
-    terms: "one-time code", detail: JSON.stringify({ kind: "code", code_doc: docHash, code_commitment, issuer: o.issuer, value: o.price, verifiable: o.verifiable, nonce: o.nonce, ...(doc.arbiter ? { arbiter: doc.arbiter, bond: true } : {}) }),
+    terms: "one-time code", detail: JSON.stringify({ kind: "code", code_doc: docHash, code_commitment, issuer: o.issuer, value: o.price, verifiable: o.verifiable, nonce: o.nonce }),
     expires_at: o.expiresAt, discount_bps: 0, accept_payment: true, discoverable: true, nonce: `code-${o.nonce}`,
   };
   await book.postListing(listing, seller.secretKey);
@@ -246,10 +248,21 @@ export async function serveCode(book: CodeBookApi, seller: CodeActor, id: string
   return book.notice(id, release, signature);
 }
 
-export type ReceivedCode = { outcome: "confirmed" | "refused"; code?: string; reason?: string; status?: CodePurchase["status"] }
+export type ReceivedCode = { outcome: "confirmed" | "refused" | "waiting"; code?: string; reason?: string; status?: CodePurchase["status"] }
 
-/** Pembeli mengunduh, memeriksa rilis dan isi terhadap `code_commitment`, dan mengonfirmasi bila cocok. Kode hanya ada di tangan pembeli. */
-export async function receiveCode(book: CodeBookApi, buyer: CodeActor, id: string, sellerPublicKey: string, sources: Partial<Record<ContentRef["kind"], ContentSource>>): Promise<ReceivedCode> {
+/** Tries the code at the issuer and says whether it worked: the buyer agent redeems (or at least asks the issuer) before it pays. */
+export type CodeRedeemer = (code: string) => Promise<boolean>;
+
+/**
+ * The buyer downloads, checks the release and the content against the code document of the listing it looked at (B6-F4, `doc`), and then (B6-F3):
+ *  - with `redeem`: tries the code at the issuer. Worked: `confirmed` (the voucher goes to the seller). Did not: `refused`, nothing is confirmed, and the one hour window stays open
+ *    for a complaint or for a proof;
+ *  - without `redeem`: `waiting`, the code is returned and nothing is confirmed; silence confirms after the window (the buyer keeps the window to try the code by other means).
+ * The code is only in the hands of the buyer.
+ */
+export async function receiveCode(
+  book: CodeBookApi, buyer: CodeActor, id: string, sellerPublicKey: string, sources: Partial<Record<ContentRef["kind"], ContentSource>>, o: { doc: CodeDocument; redeem?: CodeRedeemer },
+): Promise<ReceivedCode> {
   const view = await book.get(id);
   if (view.source === null || view.cipherHash === null || view.release === null || view.releaseSignature === null) return { outcome: "refused", reason: "the seller has not released the key" };
   let ciphertext: Uint8Array;
@@ -258,8 +271,10 @@ export async function receiveCode(book: CodeBookApi, buyer: CodeActor, id: strin
   } catch (e) {
     return { outcome: "refused", reason: e instanceof Error ? e.message : String(e) };
   }
-  const verdict = verifyCodeDelivery({ ciphertext, release: view.release, signature: view.releaseSignature, sellerPublicKey, buyerSecretKey: buyer.secretKey as string, purchaseId: id });
+  const verdict = verifyCodeDelivery({ ciphertext, release: view.release, signature: view.releaseSignature, sellerPublicKey, buyerSecretKey: buyer.secretKey as string, purchaseId: id, doc: o.doc });
   if (!verdict.ok) return { outcome: "refused", reason: verdict.reason };
+  if (o.redeem === undefined) return { outcome: "waiting", code: verdict.code!, status: view.status };
+  if (!(await o.redeem(verdict.code!))) return { outcome: "refused", reason: "the issuer did not accept the code: not confirmed", status: view.status };
   const notice = { circle: book.contract, purchase_id: id, actor: buyer.account, action: "confirmed", at: book.at(), reason: null, proof: null };
   const after = await book.notice(id, notice, signJsonNotice(book.contract, notice, buyer.secretKey));
   return { outcome: "confirmed", code: verdict.code!, status: after.status };

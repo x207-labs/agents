@@ -8,6 +8,8 @@ import { HttpCodeBook, buyCode, listCode, receiveCode, serveCode, type CodeActor
 import { BACKEND_AVAILABLE, BACKEND_DIR, CIRCLE_ID, CONTRACT, acct, startMarket } from "./backend-fixtures.ts";
 
 const credit = (n: number): string => (BigInt(n) * 1_000_000n).toString();
+/** The issuer of the backend only checks and marks; the buyer agent redeems: ask, and mark used when valid. */
+const redeemAt = async (issuer: any, c: string): Promise<boolean> => ((await issuer.checkCode(c)) === "valid" ? (issuer.markUsed(c), true) : false);
 const GIFT = "GIFT-7QK2-M9XD-41LP";
 
 describe.skipIf(!BACKEND_AVAILABLE)("AG-030 one-time codes against the real book (BE-069)", () => {
@@ -70,7 +72,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-030 one-time codes against the real book
     const served = await serveCode(book, seller, bought.purchaseId, sold, ref("r1"), buyer);
     expect(served.status).toBe("key_released");
     expect(issuer.calls).toBe(1);
-    const received = await receiveCode(book, buyer, bought.purchaseId, seller.publicKey, sources);
+    const received = await receiveCode(book, buyer, bought.purchaseId, seller.publicKey, sources, { doc: sold.doc, redeem: async (c) => redeemAt(issuer, c) });
     expect(received).toMatchObject({ outcome: "confirmed", code: GIFT, status: "confirmed" });
     expect((await book.get(bought.purchaseId)).voucher).toMatchObject({ payer: buyer.account, payee: seller.account, cumulativeAmount: credit(5) });
     const stored = wholeDatabase();
@@ -111,19 +113,21 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-030 one-time codes against the real book
     expect(await code(serveCode2(book, seller, bought.purchaseId, sold, buyer))).toBe("code_not_checked");
   });
 
-  it("TC-AG-030-11 a code above 20 credit without a bond is refused by the SDK before anything is posted; the same code with an arbiter or a checkable issuer is listed by the real book", async () => {
+  it("TC-AG-030-11 a code above its cap is refused by the SDK before anything is posted (20 credit unchecked, 100 checkable), an arbiter is refused by the real book, and the same code under the cap is listed", async () => {
     const { book, issuer, actor, expiresAt } = await start();
     const seller = actor("andi");
     issuer.issue(GIFT);
     const base = { code: GIFT, issuer: "none", verifiable: false, nonce: "r4", expiresAt };
     expect(await code(listCode(book, seller, { ...base, price: credit(25) }))).toBe("code_over_limit_unbonded");
     expect(await code(listCode(book, seller, { ...base, price: credit(20) }))).toBe("no error");
-    expect(await code(listCode(book, seller, { ...base, code: "SECOND-CODE-1234-ZZ", price: credit(25), arbiter: "arbiter.near", nonce: "r4b" }))).toBe("no error");
-    expect(await code(listCode(book, seller, { ...base, code: "THIRD-CODE-5678-YY", issuer: "shop.example", verifiable: true, price: credit(25), nonce: "r4c" }))).toBe("no error");
+    expect(await code(listCode(book, seller, { ...base, code: "THIRD-CODE-5678-YY", issuer: "shop.example", verifiable: true, price: credit(25), nonce: "r4c" }))).toBe("no error"); // checkable: capped at 100
+    expect(await code(listCode(book, seller, { ...base, code: "SECOND-CODE-1234-ZZ", issuer: "shop.example", verifiable: true, price: credit(101), nonce: "r4b" }))).toBe("code_over_limit_unbonded");
     // a listing that goes around the SDK: the real book refuses it with the same name
     const forged = await listCode(book, seller, { ...base, code: "FOURTH-CODE-9012-XX", price: credit(5), nonce: "r4d" });
     const over = { ...forged.listing, offer: { ...forged.listing.offer, value: credit(25) }, nonce: "r4e" };
     expect(await code(book.postListing(over, seller.secretKey))).toBe("code_over_limit_unbonded");
+    const withArbiter = { ...forged.listing, nonce: "r4f", detail: JSON.stringify({ ...JSON.parse(forged.listing.detail), arbiter: "arbiter.near" }) };
+    expect(await code(book.postListing(withArbiter, seller.secretKey))).toBe("arbiter_not_supported");
   });
 
   it("TC-AG-030-12 the same code listed again with another salt is not found by hash, and the issuer stops the second sale once the first buyer redeemed it", async () => {
@@ -136,9 +140,8 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-030 one-time codes against the real book
     const p1 = await buyCode(book, first, one, 42, { seq: 0, cumulative: "0" });
     publish(ref("r5").ref, one.ciphertext);
     await serveCode(book, seller, p1.purchaseId, one, ref("r5"), first);
-    const got = await receiveCode(book, first, p1.purchaseId, seller.publicKey, sources);
+    const got = await receiveCode(book, first, p1.purchaseId, seller.publicKey, sources, { doc: one.doc, redeem: async (c) => redeemAt(issuer, c) });
     expect(got.outcome).toBe("confirmed");
-    issuer.markUsed(got.code!); // the first buyer redeemed it
     const p2 = await buyCode(book, second, two, 42, { seq: 0, cumulative: "0" });
     publish(ref("r5b").ref, two.ciphertext);
     expect(await code(serveCode(book, seller, p2.purchaseId, two, ref("r5b"), second))).toBe("code_used");
