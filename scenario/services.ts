@@ -3,8 +3,8 @@
 // menandatangani voucher setelah tonggak terkonfirmasi (`milestoneVoucher`) atau per bukti on-chain (`payForProofs`), dan penjual mendaftarkannya.
 import { createHash } from "node:crypto";
 import {
-  milestoneVoucher, nep413SigningHash, orderHash, payForProofs, serializeOrder, signHash, signVoucher,
-  type InvoicePairState, type OnchainProof, type OrderDocument, type UnsignedVoucher, type Voucher,
+  OrderLedger, nep413SigningHash, orderHash, serializeOrder, signHash,
+  type InvoicePairState, type OnchainProof, type OrderDocument, type Voucher,
 } from "@x207/core";
 import { BookError, signJsonNotice, type InvoiceActor } from "./invoice-book.ts";
 
@@ -67,13 +67,15 @@ function signRaw(contract: string, json: string, actor: InvoiceActor): string {
   return signHash(nep413SigningHash(json, createHash("sha256").update(json).digest(), contract), actor.secretKey);
 }
 
-/** Pembeli membayar tonggak yang sudah terkonfirmasi: voucher dari keadaan pasangan yang sebenarnya, ditandatangani, siap didaftarkan penjual. */
-export function payMilestone(order: OrderDocument, index: number, epoch: number, state: InvoicePairState, buyer: InvoiceActor): Voucher {
-  const unsigned: UnsignedVoucher = milestoneVoucher({ order, index, epoch, state });
-  return signVoucher(unsigned, buyer.secretKey);
+/** Buku bayar satu pesanan di sisi pembeli: ingat tonggak dan bukti yang sudah dibayar (tinjauan BE-062, F4 dan F5). */
+export const ledgerFor = (order: OrderDocument): OrderLedger => new OrderLedger(order);
+
+/** Pembeli membayar tonggak yang sudah terkonfirmasi: voucher dari keadaan pasangan yang sebenarnya, ditandatangani, siap didaftarkan penjual; tonggak yang sama dua kali ditolak buku. */
+export function payMilestone(ledger: OrderLedger, index: number, epoch: number, state: InvoicePairState, buyer: InvoiceActor): Voucher {
+  return ledger.payMilestone({ index, epoch, state, secretKey: buyer.secretKey });
 }
 
-/** Agent pembeli untuk jasa keeper atau solver: satu voucher per bukti yang cocok, tidak lewat anggaran. */
-export function payProofs(order: OrderDocument, epoch: number, state: InvoicePairState, proofs: readonly OnchainProof[], alreadyPaid: readonly string[], alreadySpent: string, buyer: InvoiceActor) {
-  return payForProofs({ order, epoch, state, proofs, alreadyPaid, alreadySpent, secretKey: buyer.secretKey });
+/** Agent pembeli untuk jasa keeper atau solver: satu voucher per bukti yang cocok, tidak lewat anggaran, dan tidak dua kali. */
+export function payProofs(ledger: OrderLedger, epoch: number, state: InvoicePairState, proofs: readonly OnchainProof[], buyer: InvoiceActor) {
+  return ledger.payProofs({ epoch, state, proofs, secretKey: buyer.secretKey });
 }

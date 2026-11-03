@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { verifyVoucher, type OrderDocument } from "@x207/core";
 import { BookError } from "../scenario/invoice-book.ts";
-import { OrderBook, hashOf, payMilestone, payProofs } from "../scenario/services.ts";
+import { OrderBook, hashOf, ledgerFor, payMilestone, payProofs } from "../scenario/services.ts";
 import { BACKEND_AVAILABLE, BACKEND_DIR, CIRCLE_ID, CONTRACT, acct } from "./market.ts";
 
 const load = (path: string): Promise<any> => import(/* @vite-ignore */ pathToFileURL(`${BACKEND_DIR}${path}`).href);
@@ -74,7 +74,9 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-026 services: milestones, a dispute, a k
     // order 1: milestone 1 delivered and confirmed, milestone 2 delivered and disputed
     await book.milestone(h1, 1, audit, "delivered", { deliverable: hashOf("1") });
     expect((await book.milestone(h1, 1, research, "confirmed")).milestones[0].status).toBe("confirmed");
-    const pay1 = payMilestone(o1, 1, 42, pair("research", "audit"), research);
+    const l1 = ledgerFor(o1);
+    const l2 = ledgerFor(o2);
+    const pay1 = payMilestone(l1, 1, 42, pair("research", "audit"), research);
     expect(verifyVoucher(pay1, research.publicKey)).toBe(true);
     register(pay1);
     expect((await book.get(h1)).milestones[0].status).toBe("paid");
@@ -84,7 +86,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-026 services: milestones, a dispute, a k
     for (const i of [1, 2]) {
       await book.milestone(h2, i, research, "delivered", { deliverable: hashOf(String(2 + i)) });
       await book.milestone(h2, i, audit, "confirmed");
-      register(payMilestone(o2, i, 42, pair("audit", "research"), audit));
+      register(payMilestone(l2, i, 42, pair("audit", "research"), audit));
     }
     expect((await book.get(h2)).milestones.map((m) => m.status)).toEqual(["paid", "paid"]);
     // what moved: research owes audit 10 (milestone 1 of order 1), audit owes research 30
@@ -108,7 +110,8 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-026 services: milestones, a dispute, a k
     event({ event: "epoch_cutoff", signer: "keeper", tx: "tx-4" }); // above the budget of 3
     const { items } = await book.proofs(hash);
     expect(items.map((p) => p.txHash).sort()).toEqual(["tx-1", "tx-2", "tx-3", "tx-4"]);
-    const first = payProofs(order, 42, pair("research", "keeper"), items, [], "0", buyer);
+    const ledger = ledgerFor(order);
+    const first = payProofs(ledger, 42, pair("research", "keeper"), items, buyer);
     expect(first.paid).toHaveLength(3);
     expect(first.refused).toEqual([{ txHash: expect.any(String), reason: "over_budget" }]);
     for (const v of first.vouchers) {
@@ -117,7 +120,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-026 services: milestones, a dispute, a k
     }
     expect(pair("research", "keeper").cumulativeAmount).toBe(credit(3));
     // the agent runs again: what it paid is not paid again
-    const again = payProofs(order, 42, pair("research", "keeper"), items, first.paid, first.spent, buyer);
+    const again = payProofs(ledger, 42, pair("research", "keeper"), items, buyer);
     expect(again.paid).toEqual([]);
     expect(again.refused.every((r) => r.reason === "already_paid" || r.reason === "over_budget")).toBe(true);
   });
@@ -134,7 +137,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-026 services: milestones, a dispute, a k
     expect(accepted.milestones[0]).toMatchObject({ status: "confirmed", outcome: "accepted" });
     const rejected = await book.outcome(hash, 2, buyer, "rejected", { reason: "not_a_customer" });
     expect(rejected.milestones[1]).toMatchObject({ status: "disputed", outcome: "rejected" });
-    register(payMilestone(order, 1, 42, pair("research", "referrer"), buyer));
+    register(payMilestone(ledgerFor(order), 1, 42, pair("research", "referrer"), buyer));
     const after = await book.get(hash);
     expect(after.milestones.map((m) => m.status)).toEqual(["paid", "disputed"]);
     expect(pair("research", "referrer").cumulativeAmount).toBe(credit(5)); // the rejected conversion is not paid
