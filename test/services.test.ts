@@ -1,12 +1,13 @@
 // AG-026: agents that order and do work (SD-069, ADR-45) through the real order book of the backend (BE-054, BE-055), in process. A research agent and an audit agent order a service
 // of two milestones from each other, one milestone is disputed and not paid; a keeper agent is paid per transaction that shows on the chain; a referral is paid per conversion the
 // buyer accepts. The paying side is the SDK: the buyer signs the voucher of a confirmed milestone (`milestoneVoucher`) or of a proof (`payForProofs`); what the contract and the indexer
-// do (register the voucher, store the event) is played by `chainVoucher` of the backend tests.
+// do (register the voucher, store the event) is played by `chainVoucher` of `chain.ts`.
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { verifyVoucher, type OrderDocument } from "@x207/core";
 import { BookError } from "../scenario/invoice-book.ts";
 import { OrderBook, hashOf, ledgerFor, payMilestone, payProofs } from "../scenario/services.ts";
+import { chainVoucher } from "./chain.ts";
 import { BACKEND_AVAILABLE, BACKEND_DIR, CIRCLE_ID, CONTRACT, acct } from "./market.ts";
 
 const load = (path: string): Promise<any> => import(/* @vite-ignore */ pathToFileURL(`${BACKEND_DIR}${path}`).href);
@@ -24,7 +25,6 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-026 services: milestones, a dispute, a k
   async function start() {
     seqs = {};
     const { startMarket, openEpoch } = await load("test/marketplace/helpers.ts");
-    const helpers = await load("test/marketplace/invoice-helpers.ts");
     market = await startMarket(["research", "audit", "keeper", "referrer"]);
     openEpoch(market, 42);
     const actor = (name: string) => ({ account: acct(name), secretKey: market.keys[name].secretKey, publicKey: market.keys[name].publicKey });
@@ -37,7 +37,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-026 services: milestones, a dispute, a k
     };
     /** The seller registers the voucher of the buyer: the event and the obligation row. */
     const register = (v: { payer: string; payee: string; seq: number; cumulativeAmount: string }) =>
-      helpers.chainVoucher(market, { payer: v.payer.split(".")[0], payee: v.payee.split(".")[0], epoch: 42, seq: v.seq, cumulative: v.cumulativeAmount });
+      chainVoucher(market, { payer: v.payer.split(".")[0], payee: v.payee.split(".")[0], epoch: 42, seq: v.seq, cumulative: v.cumulativeAmount });
     let n = 0;
     /** What the indexer stores for an event, with the caller of the transaction. */
     const event = (o: { event: string; signer: string; tx: string; data?: object }) => {

@@ -1,10 +1,11 @@
 // AG-025: agents with invoices and installments against the real invoice book of the backend (BE-051), in process: in-memory database, real routes, members with real voucher
-// keys. What the contract and the indexer do is played by `chainVoucher` and `closeEpoch` of the backend tests (the event `voucher_registered` and the obligation row); the full
+// keys. What the contract and the indexer do is played by `chainVoucher` and `closeEpoch` of `chain.ts` (the event `voucher_registered` and the obligation row); the full
 // run against a contract is UM-086. Skipped when the backend repo is missing (CI of agents stands alone).
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { InvoiceError, invoiceHash, type InvoiceDocument } from "@x207/core";
 import { InvoiceBook, BookError, type InvoiceActor } from "../scenario/invoice-book.ts";
+import { chainVoucher, closeEpoch } from "./chain.ts";
 import { BACKEND_AVAILABLE, BACKEND_DIR, CIRCLE_ID, CONTRACT, acct, startMarketBook, type MarketBook } from "./market.ts";
 
 const load = (path: string): Promise<any> => import(/* @vite-ignore */ pathToFileURL(`${BACKEND_DIR}${path}`).href);
@@ -20,11 +21,10 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-025 invoice and installments through the
 
   async function start() {
     market = await startMarketBook(["supplier", "maker", "retailer"]);
-    const helpers = await load("test/marketplace/invoice-helpers.ts");
     const actor = (name: string): InvoiceActor => ({ account: acct(name), secretKey: market!.identities[name]!.voucherSecretKey });
     const book = new InvoiceBook(market.url, CIRCLE_ID, CONTRACT);
-    const chain = (payer: string, payee: string, epoch: number, seq: number, cumulative: string) => helpers.chainVoucher(market, { payer, payee, epoch, seq, cumulative });
-    const close = (epoch: number) => helpers.closeEpoch(market, epoch);
+    const chain = (payer: string, payee: string, epoch: number, seq: number, cumulative: string) => chainVoucher(market!, { payer, payee, epoch, seq, cumulative });
+    const close = (epoch: number) => closeEpoch(market!, epoch);
     /** The pair (debtor, creditor) in an epoch as the contract holds it: what the debtor needs to build the catch-up voucher. */
     const pair = (epoch: number, debtor: string, creditor: string) => {
       const row = market!.db.prepare("SELECT seq, cumulative_amount FROM obligations WHERE circle_id = ? AND epoch = ? AND debtor = ? AND creditor = ?").get(CIRCLE_ID, epoch, acct(debtor), acct(creditor)) as { seq: number | bigint; cumulative_amount: string } | undefined;
