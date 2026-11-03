@@ -18,8 +18,8 @@ export type PurchaseState = {
 const sha256Hex = (text: string): string => createHash("sha256").update(text).digest("hex");
 
 export class LicenseBook {
-  private readonly base: string;
-  private readonly circleId: string;
+  protected readonly base: string;
+  protected readonly circleId: string;
   readonly contract: string;
   private readonly now: () => number;
 
@@ -33,7 +33,7 @@ export class LicenseBook {
     return this.now();
   }
 
-  private async call(method: "GET" | "POST", path: string, body?: unknown): Promise<any> {
+  protected async call(method: "GET" | "POST", path: string, body?: unknown): Promise<any> {
     const res = await fetch(`${this.base}/x207/circles/${this.circleId}${path}`, {
       method, ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
     });

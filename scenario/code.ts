@@ -12,6 +12,7 @@ import {
 } from "@x207/core";
 import { BuyerMeter } from "@x207/scheme";
 import { BookError, signJsonNotice, type InvoiceActor } from "./invoice-book.ts";
+import { LicenseBook, type PurchaseState } from "./license.ts";
 
 export type CodeActor = InvoiceActor & { publicKey: string };
 
@@ -41,11 +42,8 @@ export class MockCodeIssuer implements CodeIssuer {
   }
 }
 
-export type CodePurchase = {
-  purchaseId: string; listingHash: string; buyer: string; seller: string; status: "paid_held" | "cipher_posted" | "key_released" | "confirmed" | "cancelled"
-  contentHash: string; source: ContentRef | null; cipherHash: string | null; release: any | null; releaseSignature: string | null; disputeUntil: number | null
-  voucher?: Voucher
-}
+/** Keadaan satu pembelian kode: bentuk yang sama dengan pembelian lisensi (BE-056); kode selalu eksklusif. */
+export type CodePurchase = PurchaseState;
 
 /** Yang dipakai penjual dan pembeli dari buku kode; buku asli (BE-069) memetakan ini ke rute HTTP. */
 export interface CodeBookApi {
@@ -55,8 +53,11 @@ export interface CodeBookApi {
   purchase(hash: string, voucher: UnsignedVoucher, secretKey: VoucherSecretKey): Promise<CodePurchase>;
   get(id: string): Promise<CodePurchase>;
   notice(id: string, notice: any, signature: string): Promise<CodePurchase>;
-  /** Penjual menunjukkan kode sekali agar penerbit dicek; buku menyimpan hanya putusannya. Melempar `code_used`, `code_unknown`, atau `code_issuer_unknown`. */
-  check(commitment: string, code: string, salt: string): Promise<{ verdict: CodeCheck; checkedAt: number }>;
+  /**
+   * Penjual menunjukkan kode sekali agar penerbit dicek (`POST /listings/{hash}/code-check`); buku menyimpan hanya vonis dan waktunya dan menjawab 200 dengan vonis: `used`
+   * membatalkan pembelian dan listing. Melempar `code_issuer_unknown`, `code_issuer_unavailable`, `code_not_verifiable`, atau `code_bad_commitment`.
+   */
+  check(listingHash: string, seller: CodeActor, code: string, salt: string): Promise<{ verdict: CodeCheck; checkedAt: number }>;
 }
 
 type Held = CodePurchase & { ciphertext?: Uint8Array; voucherHeld?: Voucher; price: string }
@@ -116,7 +117,7 @@ export class MockCodeBook implements CodeBookApi {
     const id = `cp-${this.next++}`;
     const p: Held = {
       purchaseId: id, listingHash: hash, buyer: voucher.payer, seller: entry.listing.account, status: "paid_held", contentHash: entry.detail.code_commitment, source: null, cipherHash: null,
-      release: null, releaseSignature: null, disputeUntil: null, voucherHeld: signed, price: entry.listing.offer.value,
+      release: null, releaseSignature: null, disputeUntil: null, exclusive: true, needsBond: false, autoConfirmed: false, voucherHeld: signed, price: entry.listing.offer.value,
     };
     this.purchases.set(id, p);
     return this.view(p);
@@ -132,7 +133,7 @@ export class MockCodeBook implements CodeBookApi {
   /** The voucher of the buyer is in no answer until the purchase is confirmed. */
   private view(p: Held): CodePurchase {
     const { ciphertext: _c, voucherHeld, price: _p, ...rest } = p;
-    return { ...rest, ...(p.status === "confirmed" && voucherHeld ? { voucher: voucherHeld } : {}) };
+    return { ...rest, exclusive: true, needsBond: false, autoConfirmed: false, ...(p.status === "confirmed" && voucherHeld ? { voucher: voucherHeld } : {}) };
   }
 
   async notice(id: string, notice: any, _signature: string): Promise<CodePurchase> {
@@ -166,17 +167,18 @@ export class MockCodeBook implements CodeBookApi {
     throw new BookError(400, "notice_unknown", String(notice.action));
   }
 
-  async check(commitment: string, code: string, salt: string): Promise<{ verdict: CodeCheck; checkedAt: number }> {
-    const entry = [...this.listings.values()].find((l) => l.detail.code_commitment === commitment);
-    if (!entry) throw new BookError(404, "listing_not_found", "no listing with this commitment");
-    const saltBytes = Uint8Array.from(Buffer.from(salt, "hex"));
+  async check(hash: string, _seller: CodeActor, code: string, salt: string): Promise<{ verdict: CodeCheck; checkedAt: number }> {
+    const entry = this.listings.get(hash);
+    if (!entry) throw new BookError(404, "listing_not_found", hash);
+    const commitment: string = entry.detail.code_commitment;
     let ok = false;
     try {
-      ok = codeCommitment(code, saltBytes) === commitment;
+      ok = codeCommitment(code, Uint8Array.from(Buffer.from(salt, "hex"))) === commitment;
     } catch {
       ok = false;
     }
-    if (!ok) throw new BookError(400, "code_format_invalid", "code and salt do not match the commitment");
+    if (!ok) throw new BookError(400, "code_bad_commitment", "code and salt do not match the commitment");
+    if (!entry.detail.verifiable) throw new BookError(400, "code_not_verifiable", "the issuer has no check");
     const issuer = this.issuers[entry.detail.issuer];
     if (!issuer) throw new BookError(400, "code_issuer_unknown", entry.detail.issuer);
     const verdict = await issuer.checkCode(code); // the code goes to the issuer only; the book keeps the verdict
@@ -185,10 +187,17 @@ export class MockCodeBook implements CodeBookApi {
     if (verdict === "used") {
       // a used code cannot be sold: every open purchase of it is cancelled and its voucher is let go
       for (const p of this.purchases.values()) if (p.contentHash === commitment && p.status !== "confirmed") { p.status = "cancelled"; delete p.voucherHeld; }
-      throw new BookError(409, "code_used", "the issuer says the code is used");
     }
-    if (verdict === "unknown") throw new BookError(409, "code_unknown", "the issuer does not know the code");
-    return record;
+    return record; // like the real book: the answer is 200 with the verdict; the key release is what refuses a verdict that is not valid
+  }
+}
+
+/** Buku kode asli (BE-069) lewat HTTP: rute pembelian BE-056 yang sama, ditambah `POST /listings/{hash}/code-check`. */
+export class HttpCodeBook extends LicenseBook implements CodeBookApi {
+  async check(hash: string, seller: CodeActor, code: string, salt: string): Promise<{ verdict: CodeCheck; checkedAt: number }> {
+    const notice = { circle: this.contract, listing_hash: hash, actor: seller.account, action: "check", at: this.at() };
+    const answer = await this.call("POST", `/listings/${hash}/code-check`, { notice, signature: signJsonNotice(this.contract, notice, seller.secretKey), code, salt });
+    return { verdict: answer.verdict, checkedAt: answer.checkedAt };
   }
 }
 
@@ -205,7 +214,7 @@ export async function listCode(book: CodeBookApi, seller: CodeActor, o: {
     circle: book.contract, account: seller.account,
     offer: { asset_type: o.assetType ?? "code:gift", asset_class: "D", quantity: 1, value: o.price },
     want: { asset_type: "usdc", asset_class: "A", quantity: 1, value: o.price },
-    terms: "one-time code", detail: JSON.stringify({ kind: "code", code_doc: docHash, code_commitment, issuer: o.issuer, value: o.price, verifiable: o.verifiable, ...(doc.arbiter ? { arbiter: doc.arbiter, bond: true } : {}) }),
+    terms: "one-time code", detail: JSON.stringify({ kind: "code", code_doc: docHash, code_commitment, issuer: o.issuer, value: o.price, verifiable: o.verifiable, nonce: o.nonce, ...(doc.arbiter ? { arbiter: doc.arbiter, bond: true } : {}) }),
     expires_at: o.expiresAt, discount_bps: 0, accept_payment: true, discoverable: true, nonce: `code-${o.nonce}`,
   };
   await book.postListing(listing, seller.secretKey);
@@ -225,7 +234,11 @@ export function buyCode(book: CodeBookApi, buyer: InvoiceActor, sold: SoldCode, 
 export async function serveCode(book: CodeBookApi, seller: CodeActor, id: string, sold: SoldCode, source: ContentRef, buyer: CodeActor): Promise<CodePurchase> {
   const posted = { circle: book.contract, purchase_id: id, actor: seller.account, action: "cipher_posted", at: book.at(), source, cipher_hash: contentHash(sold.ciphertext) };
   await book.notice(id, posted, signJsonNotice(book.contract, posted, seller.secretKey));
-  if (sold.doc.verifiable) await book.check(sold.doc.code_commitment, sold.code, Buffer.from(sold.salt).toString("hex"));
+  if (sold.doc.verifiable) {
+    const { verdict } = await book.check(sold.listingHash, seller, sold.code, Buffer.from(sold.salt).toString("hex"));
+    // the book already cancelled the sale on `used`; the key stays with the seller whatever the verdict that is not valid
+    if (verdict !== "valid") throw new BookError(409, `code_${verdict}`, "the issuer did not say valid: the key is not released");
+  }
   const { release, signature } = createCodeRelease({
     doc: sold.doc, code: sold.code, salt: sold.salt, buyer: buyer.account, buyerPublicKey: buyer.publicKey, purchase_id: id, ciphertext: sold.ciphertext, contentKey: sold.key, at: book.at(),
     sellerSecretKey: seller.secretKey as string,

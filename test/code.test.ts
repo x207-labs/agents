@@ -117,19 +117,20 @@ describe("AG-030 one-time codes: mock book and mock issuer", () => {
     expect((await book.get(p2.purchaseId)).status).toBe("cancelled");
   });
 
-  it("TC-AG-030-05 the check shows the code to the issuer only with a salt that matches the commitment; a wrong code or an unknown issuer or an unknown code is refused", async () => {
+  it("TC-AG-030-05 the check shows the code to the issuer only with a salt that matches the commitment; a wrong code or an unknown issuer is refused, and an unknown code gives no key", async () => {
     const { book, issuer, actor, expiresAt } = setup();
     const seller = actor("andi");
     issuer.issue(GIFT);
     const sold = await listCode(book, seller, { code: GIFT, issuer: "shop.example", verifiable: true, price: credit(5), nonce: "e1", expiresAt });
     const salt = Buffer.from(sold.salt).toString("hex");
-    expect(await errCode(book.check(sold.doc.code_commitment, "WRONG-CODE-0000-AAAA", salt))).toBe("code_format_invalid");
+    expect(await errCode(book.check(sold.listingHash, seller, "WRONG-CODE-0000-AAAA", salt))).toBe("code_bad_commitment");
     expect(issuer.asked).toEqual([]); // a wrong code never reaches the issuer
     const unknown = await listCode(book, seller, { code: "NOT-ISSUED-0000-BBBB", issuer: "shop.example", verifiable: true, price: credit(5), nonce: "e2", expiresAt });
-    expect(await errCode(book.check(unknown.doc.code_commitment, unknown.code, Buffer.from(unknown.salt).toString("hex")))).toBe("code_unknown");
+    expect(await book.check(unknown.listingHash, seller, unknown.code, Buffer.from(unknown.salt).toString("hex"))).toMatchObject({ verdict: "unknown" });
+    expect(await errCode(serveCode(book, seller, (await buyCode(book, actor("budi"), unknown, 42, { seq: 0, cumulative: "0" })).purchaseId, unknown, { kind: "https", ref: "https://store.example.com/e2.bin" }, actor("budi")))).toBe("code_unknown"); // the key does not leave
     const noIssuer = { ...sold.listing, nonce: "e3", detail: JSON.stringify({ ...JSON.parse(sold.listing.detail), issuer: "nobody.example" }) };
     expect(await errCode(book.postListing(noIssuer, seller.secretKey))).toBe("code_issuer_unknown");
-    expect(await errCode(book.check(sold.doc.code_commitment, GIFT, salt))).toBe("no error");
+    expect(await errCode(book.check(sold.listingHash, seller, GIFT, salt))).toBe("no error");
   });
 });
 
