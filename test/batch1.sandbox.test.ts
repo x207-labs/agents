@@ -70,7 +70,7 @@ describe.skipIf(!ready)("AG-023 ten kinds of batch 1 in near-sandbox", () => {
         const r = await accounts.get(account)!.call({ ...c, deposit: c.deposit ?? 0n }, "FINAL");
         return { failures: r.failures, logs: r.logs, value: r.value };
       },
-      view: (contractId, method, args) => fx.sandbox.view(contractId, method, args),
+      view: (contractId, method, args) => fx.sandbox.view(contractId, method, args as Record<string, unknown>),
     });
 
     expect(steps.filter((s) => !s.ok), JSON.stringify(steps.filter((s) => !s.ok))).toEqual([]);
