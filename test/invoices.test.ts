@@ -13,7 +13,7 @@ describe("AG-021 invoice menjadi voucher dan netting", () => {
     expect(invoiceHash({ ...invoices[0]! })).toBe(h);
     expect(invoiceHash({ ...invoices[0]!, amount: credit(101) })).not.toBe(h);
     expect(invoiceHash({ ...invoices[0]!, memo: "other" })).not.toBe(h);
-    expect(invoiceResource(invoices[0]!)).toBe(`invoice:${h}`);
+    expect(invoiceResource(invoices[0]!)).toBe(`x207:invoice:${h}`);
     expect(invoiceResource(invoices[0]!)).not.toContain("components");
   });
 
@@ -22,7 +22,7 @@ describe("AG-021 invoice menjadi voucher dan netting", () => {
     const vouchers = buildInvoiceVouchers({ circle: "x207-circle.near", epoch: 7, invoices, secretKeys: Object.fromEntries(Object.entries(keys).map(([a, k]) => [a, k.secretKey])) });
     expect(vouchers).toHaveLength(3);
     for (const v of vouchers) {
-      expect(v.voucher).toMatchObject({ payer: v.invoice.debtor, payee: v.invoice.issuer, epoch: 7, seq: 1, cumulativeAmount: v.invoice.amount, unit: "credit", resource: `invoice:${v.hash}` });
+      expect(v.voucher).toMatchObject({ payer: v.invoice.debtor, payee: v.invoice.issuer, epoch: 7, seq: 1, cumulativeAmount: v.invoice.amount, unit: "credit", resource: `x207:invoice:${v.hash}` });
       expect(verifyVoucher({ ...v.voucher, signature: v.signature }, keys[v.invoice.debtor]!.publicKey)).toBe(true);
     }
   });

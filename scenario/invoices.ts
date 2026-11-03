@@ -1,22 +1,19 @@
-// Skenario `realworld` (AG-021, K-59): tiga bisnis saling punya invoice. Tiap invoice dicatat sebagai voucher kumulatif debitur ke
-// kreditur dengan `resource = invoice:<sha256 invoice>` (hash invoice off-chain; isi invoice tidak masuk rantai). Kliring F3 menghapus
+// Skenario `realworld` (AG-021, K-59; format SDK sejak AG-025): tiga bisnis saling punya invoice. Tiap invoice dicatat sebagai voucher kumulatif debitur ke
+// kreditur dengan `resource = x207:invoice:<sha256 invoice>` (hash invoice off-chain; isi invoice tidak masuk rantai). Kliring F3 menghapus
 // utang melingkar dan selisihnya masuk jalur residual F4. Tidak ada kontrak baru: hanya voucher dan kliring yang sudah ada.
-import { createHash } from "node:crypto";
-import { signVoucher, type Voucher } from "@x207/core";
+import { invoiceHash as sdkInvoiceHash, invoiceResource as sdkInvoiceResource, signVoucher, type InvoiceDocument, type Voucher } from "@x207/core";
 
 const CREDIT = 1_000_000n;
 export const credit = (n: number | bigint): string => (BigInt(n) * CREDIT).toString();
 
-/** Invoice: `issuer` menagih `debtor` sebesar `amount` (satuan terkecil credit) untuk `memo`. */
-export type Invoice = { id: string; issuer: string; debtor: string; amount: string; memo: string };
+/** Invoice: `issuer` menagih `debtor` sebesar `amount` (satuan terkecil credit) untuk `memo`. Sama dengan dokumen invoice SDK (SD-065). */
+export type Invoice = InvoiceDocument;
 
-/** Hash invoice: sha256 atas JSON kanonik `{id, issuer, debtor, amount, memo}`; heks huruf kecil 64 karakter. */
-export function invoiceHash(invoice: Invoice): string {
-  const { id, issuer, debtor, amount, memo } = invoice;
-  return createHash("sha256").update(JSON.stringify({ id, issuer, debtor, amount, memo })).digest("hex");
-}
+/** Hash invoice menurut SDK: sha256 atas JSON kanonik `{id, issuer, debtor, amount, memo}`; heks huruf kecil 64 karakter. */
+export const invoiceHash = (invoice: Invoice): string => sdkInvoiceHash(invoice);
 
-export const invoiceResource = (invoice: Invoice): string => `invoice:${invoiceHash(invoice)}`;
+/** `resource` voucher invoice: `x207:invoice:<hash>` (format SDK; skenario AG-021 lama memakai `invoice:<hash>`). */
+export const invoiceResource = (invoice: Invoice): string => sdkInvoiceResource(sdkInvoiceHash(invoice));
 
 /** Tiga bisnis: pemasok (supplier), pabrik (maker), pengecer (retailer). Utang melingkar maker -> supplier -> retailer -> maker. */
 export type Businesses = { supplier: string; maker: string; retailer: string };
