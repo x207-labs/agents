@@ -1,13 +1,11 @@
 // AG-027: agents that sell and buy licenses of content (SD-070, ADR-46) through the real purchase routes of the backend (BE-056), in process: in-memory database, real voucher keys, a
 // fake "internet" that serves the ciphertext. The key of the file never reaches the backend, and the voucher of the buyer is in no answer until the purchase is confirmed or refuted.
-import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { contentHash, httpsSource, type ContentRef, type ContentSource } from "@x207/core";
 import { BookError } from "../scenario/invoice-book.ts";
 import { LicenseBook, buyLicense, falseDispute, listLicense, receiveLicense, serveLicense, type LicenseActor } from "../scenario/license.ts";
-import { BACKEND_AVAILABLE, BACKEND_DIR, CIRCLE_ID, CONTRACT, acct } from "./market.ts";
+import { BACKEND_AVAILABLE, CIRCLE_ID, CONTRACT, acct, startMarket } from "./backend-fixtures.ts";
 
-const load = (path: string): Promise<any> => import(/* @vite-ignore */ pathToFileURL(`${BACKEND_DIR}${path}`).href);
 const CREDIT = 1_000_000n;
 const credit = (n: number): string => (BigInt(n) * CREDIT).toString();
 const text = (s: string) => new TextEncoder().encode(s);
@@ -41,9 +39,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-027 licenses of content: fair exchange w
 
   async function start() {
     files.clear();
-    const { startMarket, openEpoch } = await load("test/marketplace/helpers.ts");
-    market = await startMarket(["andi", "budi", "citra", "dewi"], [], undefined, { sourceFetch: { resolver, transport } });
-    openEpoch(market, 42);
+    market = await startMarket(["andi", "budi", "citra", "dewi"], { sourceFetch: { resolver, transport } });
     const actor = (name: string): LicenseActor => ({ account: acct(name), secretKey: market.keys[name].secretKey, publicKey: market.keys[name].publicKey });
     const book = new LicenseBook(market.srv.url, CIRCLE_ID, CONTRACT, () => Math.floor(market.clock.now / 1000));
     const expiresAt = Math.floor(market.clock.now / 1000) + 86_400;

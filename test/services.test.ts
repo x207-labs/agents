@@ -2,15 +2,13 @@
 // of two milestones from each other, one milestone is disputed and not paid; a keeper agent is paid per transaction that shows on the chain; a referral is paid per conversion the
 // buyer accepts. The paying side is the SDK: the buyer signs the voucher of a confirmed milestone (`milestoneVoucher`) or of a proof (`payForProofs`); what the contract and the indexer
 // do (register the voucher, store the event) is played by `chainVoucher` of `chain.ts`.
-import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { verifyVoucher, type OrderDocument } from "@x207/core";
 import { BookError } from "../scenario/invoice-book.ts";
 import { OrderBook, hashOf, ledgerFor, payMilestone, payProofs } from "../scenario/services.ts";
 import { chainVoucher } from "./chain.ts";
-import { BACKEND_AVAILABLE, BACKEND_DIR, CIRCLE_ID, CONTRACT, acct } from "./market.ts";
+import { BACKEND_AVAILABLE, CIRCLE_ID, CONTRACT, acct, startMarket } from "./backend-fixtures.ts";
 
-const load = (path: string): Promise<any> => import(/* @vite-ignore */ pathToFileURL(`${BACKEND_DIR}${path}`).href);
 const CREDIT = 1_000_000n;
 const credit = (n: number): string => (BigInt(n) * CREDIT).toString();
 
@@ -24,9 +22,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-026 services: milestones, a dispute, a k
 
   async function start() {
     seqs = {};
-    const { startMarket, openEpoch } = await load("test/marketplace/helpers.ts");
     market = await startMarket(["research", "audit", "keeper", "referrer"]);
-    openEpoch(market, 42);
     const actor = (name: string) => ({ account: acct(name), secretKey: market.keys[name].secretKey, publicKey: market.keys[name].publicKey });
     const book = new OrderBook(market.srv.url, CIRCLE_ID, CONTRACT, () => Math.floor(market.clock.now / 1000));
     const due = (days: number) => Math.floor(market.clock.now / 1000) + days * 86_400;

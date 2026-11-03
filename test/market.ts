@@ -1,18 +1,13 @@
 // Buku marketplace backend (M11) berjalan di dalam proses untuk test agent: database D9 dalam memori, anggota dengan kunci voucher agent,
 // satu epoch `open`, dan route marketplace asli. Dimuat lewat import dinamis supaya typecheck agents tidak mengikuti kode backend,
 // dan test dilewati bila repo backend tidak ada (CI agents berdiri sendiri).
-import { existsSync } from "node:fs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { generateVoucherKeypair, type BundleTerms } from "@x207/core";
 import { BookClient } from "../shared/barter.ts";
 import type { AgentIdentity } from "../shared/identity.ts";
+import { BACKEND_AVAILABLE, BACKEND_DIR, CIRCLE_ID, CONTRACT, acct, listen, openDatabase, seedEpoch, seedMember } from "./backend-fixtures.ts";
 
-export const BACKEND_DIR = fileURLToPath(new URL("../../backend/", import.meta.url));
-export const BACKEND_AVAILABLE = existsSync(`${BACKEND_DIR}src/marketplace/index.ts`) && existsSync(`${BACKEND_DIR}node_modules/better-sqlite3`);
-
-export const CONTRACT = "x207-circle.near";
-export const CIRCLE_ID = "agents-main";
-export const acct = (name: string): string => `${name}.${CONTRACT}`;
+export { BACKEND_AVAILABLE, BACKEND_DIR, CIRCLE_ID, CONTRACT, acct };
 
 const load = (path: string): Promise<any> => import(/* @vite-ignore */ pathToFileURL(`${BACKEND_DIR}${path}`).href);
 
@@ -31,19 +26,12 @@ export type MarketBook = {
 };
 
 export async function startMarketBook(names: readonly string[], options: { now?: number } = {}): Promise<MarketBook> {
-  const [{ default: Database }, fixtures, marketplace, core] = await Promise.all([
-    load("node_modules/better-sqlite3/lib/index.js").then((m) => ({ default: m.default ?? m })),
-    load("test/helpers/d9-fixtures.ts"),
-    load("src/marketplace/index.ts"),
-    import("@x207/core"),
-  ]);
-  const db = new Database(":memory:");
-  fixtures.seedCircle(db);
+  const [marketplace, core] = await Promise.all([load("src/marketplace/index.ts"), import("@x207/core")]);
+  const db = await openDatabase();
   const identities: Record<string, AgentIdentity> = {};
   for (const name of names) {
-    fixtures.seedMember(db, { name });
     const keys = generateVoucherKeypair();
-    db.prepare("UPDATE members SET pubkey_voucher = ? WHERE circle_id = ? AND account_id = ?").run(keys.publicKey, CIRCLE_ID, acct(name));
+    seedMember(db, name, keys.publicKey);
     identities[name] = {
       accountId: acct(name),
       voucherSecretKey: keys.secretKey,
@@ -51,9 +39,9 @@ export async function startMarketBook(names: readonly string[], options: { now?:
       policy: { maxPerCall: "100000", maxPerEpoch: "10000000" },
     };
   }
-  fixtures.seedEpoch(db, { epoch: 42, phase: "open", cutoffAt: "2026-12-31T00:00:00Z" });
+  seedEpoch(db, 42, "open", "2026-12-31T00:00:00Z");
   const clock = { now: options.now ?? Date.now() };
-  const server = await fixtures.listen({ db, now: () => clock.now, extraRoutes: marketplace.marketplaceRoutes(db) });
+  const server = await listen({ db, now: () => clock.now, extraRoutes: marketplace.marketplaceRoutes(db) });
   return {
     book: new BookClient({ baseUrl: server.url, circleId: CIRCLE_ID }),
     url: server.url,

@@ -1,14 +1,12 @@
 // AG-025: agents with invoices and installments against the real invoice book of the backend (BE-051), in process: in-memory database, real routes, members with real voucher
 // keys. What the contract and the indexer do is played by `chainVoucher` and `closeEpoch` of `chain.ts` (the event `voucher_registered` and the obligation row); the full
 // run against a contract is UM-086. Skipped when the backend repo is missing (CI of agents stands alone).
-import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { InvoiceError, invoiceHash, type InvoiceDocument } from "@x207/core";
 import { InvoiceBook, BookError, type InvoiceActor } from "../scenario/invoice-book.ts";
 import { chainVoucher, closeEpoch } from "./chain.ts";
-import { BACKEND_AVAILABLE, BACKEND_DIR, CIRCLE_ID, CONTRACT, acct, startMarketBook, type MarketBook } from "./market.ts";
+import { BACKEND_AVAILABLE, CIRCLE_ID, CONTRACT, acct, startMarketBook, type MarketBook } from "./market.ts";
 
-const load = (path: string): Promise<any> => import(/* @vite-ignore */ pathToFileURL(`${BACKEND_DIR}${path}`).href);
 const CREDIT = 1_000_000n;
 const credit = (n: number): string => (BigInt(n) * CREDIT).toString();
 
