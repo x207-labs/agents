@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, statSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -28,6 +28,25 @@ describe("AG-004 onboarding", () => {
     expect(statSync(identityPath(dir, "sandbox", "a.test.near")).mode & 0o777).toBe(0o600);
     expect(loadIdentity(dir, "sandbox", "a.test.near")).toMatchObject({ voucherPublicKey: publicKey, policy: POLICY });
     expect(loadIdentity(dir, "sandbox", "b.test.near")).toBeNull();
+  });
+
+  it("TC-AG-004-F8 berkas kunci dengan bit grup atau pengguna lain ditolak, direktori lama diperketat ke 0700 saat menyimpan (review BE-063)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "x207-keys-f8-"));
+    dirs.push(dir);
+    const { publicKey, secretKey } = generateVoucherKeypair();
+    const identity = { accountId: "a.test.near", voucherSecretKey: secretKey, voucherPublicKey: publicKey, policy: POLICY };
+    const file = saveIdentity(dir, "sandbox", identity);
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    chmodSync(file, 0o640);
+    expect(() => loadIdentity(dir, "sandbox", "a.test.near")).toThrow(/mode 640/);
+    chmodSync(file, 0o604);
+    expect(() => loadIdentity(dir, "sandbox", "a.test.near")).toThrow(/chmod 600/);
+    chmodSync(file, 0o400);
+    expect(loadIdentity(dir, "sandbox", "a.test.near")).toMatchObject({ voucherPublicKey: publicKey });
+    chmodSync(join(dir, "sandbox"), 0o755);
+    chmodSync(file, 0o600);
+    saveIdentity(dir, "sandbox", identity);
+    expect(statSync(join(dir, "sandbox")).mode & 0o777).toBe(0o700);
   });
 
   it("enam agent: kunci voucher berbeda, join dan stake dikirim dari akun agent, ulang tidak mengirim apa pun", async () => {
