@@ -3,8 +3,8 @@
 // menandatangani voucher setelah tonggak terkonfirmasi (`milestoneVoucher`) atau per bukti on-chain (`payForProofs`), dan penjual mendaftarkannya.
 import { createHash } from "node:crypto";
 import {
-  OrderLedger, nep413SigningHash, orderHash, serializeOrder, signHash,
-  type InvoicePairState, type OnchainProof, type OrderDocument, type Voucher,
+  OrderLedger, nep413SigningHash, orderClaimNotice, orderHash, serializeOrder, signHash,
+  type DelegateMandate, type InvoicePairState, type OnchainProof, type OrderDocument, type Voucher,
 } from "@x207/core";
 import { BookError, signJsonNotice, type InvoiceActor } from "./invoice-book.ts";
 
@@ -43,12 +43,18 @@ export class OrderBook {
     return this.call("GET", `/orders/${hash}`);
   }
   /** Pesanan dibuka setelah KEDUA pihak menandatangani: tanda tangan pertama menyimpannya sebagai `proposed`, yang kedua membukanya. */
-  async open(doc: OrderDocument, buyer: InvoiceActor, seller: InvoiceActor): Promise<string> {
-    // the signature is over serializeOrder(doc) itself: the same bytes the backend hashes
+  async open(doc: OrderDocument, buyer: InvoiceActor, seller: InvoiceActor, mandate?: DelegateMandate): Promise<string> {
+    // the signature is over serializeOrder(doc) itself: the same bytes the backend hashes; a delegate order also carries its mandate (SD-072)
     const sign = (a: InvoiceActor) => ({ account: a.account, signature: signRaw(this.contract, serializeOrder(doc), a) });
-    await this.call("POST", "/orders", { order: doc, signatures: [sign(buyer)] });
-    await this.call("POST", "/orders", { order: doc, signatures: [sign(seller)] });
+    const extra = mandate ? { mandate } : {};
+    await this.call("POST", "/orders", { order: doc, signatures: [sign(buyer)], ...extra });
+    await this.call("POST", "/orders", { order: doc, signatures: [sign(seller)], ...extra });
     return orderHash(doc);
+  }
+  /** The delegate claims one transaction of its vote (SD-072, BE-055): a notice signed like the other notices; the backend checks the transaction through its RPC. */
+  claim(hash: string, txHash: string, seller: InvoiceActor) {
+    const notice = orderClaimNotice({ circle: this.contract, orderHash: hash, actor: seller.account, at: this.at(), txHash });
+    return this.call("POST", `/orders/${hash}/claims`, { tx_hash: txHash, notice, signature: signJsonNotice(this.contract, notice, seller.secretKey) });
   }
   milestone(hash: string, index: number, actor: InvoiceActor, action: "delivered" | "confirmed" | "disputed" | "cancelled", o: { deliverable?: string; reason?: string } = {}) {
     const notice = { circle: this.contract, order_hash: hash, milestone: index, actor: actor.account, action, at: this.at(), deliverable_hash: action === "delivered" ? (o.deliverable ?? null) : null, reason: action === "disputed" ? (o.reason ?? null) : null };
@@ -58,8 +64,14 @@ export class OrderBook {
     const notice = { circle: this.contract, order_hash: hash, milestone: place, actor: actor.account, action, at: this.at(), deliverable_hash: action === "proposed" ? (o.result ?? null) : null, reason: action === "rejected" ? (o.reason ?? null) : null };
     return this.call("POST", `/orders/${hash}/outcomes`, { notice, signature: signJsonNotice(this.contract, notice, actor.secretKey) });
   }
-  proofs(hash: string): Promise<{ items: OnchainProof[]; maxProofs: number }> {
-    return this.call("GET", `/orders/${hash}/onchain-proofs`);
+  /** The proofs as the SDK reads them: a delegate's claims come in camelCase and are turned into `proposal_id` and `proposal_kind`. */
+  async proofs(hash: string): Promise<{ items: OnchainProof[]; maxProofs: number }> {
+    const raw = (await this.call("GET", `/orders/${hash}/onchain-proofs`)) as { items: Array<Record<string, unknown>>; maxProofs: number };
+    const items = raw.items.map((p): OnchainProof =>
+      p.proposalId === undefined
+        ? (p as unknown as OnchainProof)
+        : { txHash: String(p.txHash), method: String(p.method), signer: String(p.signer), receiver: String(p.receiver), proposal_id: Number(p.proposalId), action: String(p.action), proposal_kind: String(p.proposalKind) });
+    return { items, maxProofs: raw.maxProofs };
   }
 }
 
@@ -76,6 +88,6 @@ export function payMilestone(ledger: OrderLedger, index: number, epoch: number, 
 }
 
 /** Agent pembeli untuk jasa keeper atau solver: satu voucher per bukti yang cocok, tidak lewat anggaran, dan tidak dua kali. */
-export function payProofs(ledger: OrderLedger, epoch: number, state: InvoicePairState, proofs: readonly OnchainProof[], buyer: InvoiceActor) {
-  return ledger.payProofs({ epoch, state, proofs, secretKey: buyer.secretKey });
+export function payProofs(ledger: OrderLedger, epoch: number, state: InvoicePairState, proofs: readonly OnchainProof[], buyer: InvoiceActor, mandate?: DelegateMandate) {
+  return ledger.payProofs({ epoch, state, proofs, secretKey: buyer.secretKey, ...(mandate ? { mandate } : {}) });
 }
