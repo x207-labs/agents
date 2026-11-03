@@ -59,7 +59,7 @@ export async function startStack(
   const pending = new PendingStore(":memory:");
   const rpc = new NearRpc({ urls: [fx.sandbox.rpcUrl], timeoutMs: 30_000 });
   const circle = defineCircleConfig({ network: "x207:agents-main", circleContract: fx.circle.accountId });
-  const app = createApp(createFacilitatorService({ circles: [circle], rpc, pending, signers: [relayer.accountId], ...(options.now ? { now: options.now } : {}) }));
+  const app = createApp(createFacilitatorService({ circles: [circle], rpc, pending, signers: [relayer.accountId], ...(options.now ? { now: options.now } : {}) }), { rateLimit: false });
   const settled: unknown[] = [];
   const facilitator = await serveWeb(async (request) => {
     const response = await app.fetch(request);

@@ -55,7 +55,7 @@ describe.skipIf(!sandboxAvailable)("AG-005 cincin enam agent di near-sandbox", (
     const pending = new PendingStore(":memory:");
     const rpc = new NearRpc({ urls: [fx.sandbox.rpcUrl], timeoutMs: 30_000 });
     const circle = defineCircleConfig({ network: "x207:agents-main", circleContract: fx.circle.accountId });
-    const app = createApp(createFacilitatorService({ circles: [circle], rpc, pending, signers: [relayer.accountId] }));
+    const app = createApp(createFacilitatorService({ circles: [circle], rpc, pending, signers: [relayer.accountId] }), { rateLimit: false });
     const settled: unknown[] = [];
     const facilitator = await serveWeb(async (request) => {
       const response = await app.fetch(request);
