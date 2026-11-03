@@ -10,6 +10,8 @@ import {
 export type InvoiceActor = { account: string; secretKey: VoucherSecretKey };
 export type InstallmentState = {
   index: number; epoch: number; amount: string; status: "scheduled" | "registered" | "shifted" | "missed"; reason: "headroom" | "blocked_by_debtor" | null; voucherEpoch: number | null; shifted: boolean;
+  /** The voucher the issuer registers, signed by the debtor (the catch-up voucher after a shift); `null` before the debtor approved (BE-051). */
+  voucher: UnsignedVoucher | null; signature: string | null;
 };
 export type InvoiceState = {
   invoiceHash: string; document: InvoiceDocument; issuer: string; debtor: string; status: "requested" | "approved" | "registered" | "rejected" | "expired" | "missed"
