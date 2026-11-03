@@ -92,7 +92,7 @@ export async function serveLicense(book: LicenseBook, seller: LicenseActor, id: 
   const posted = { circle: book.contract, purchase_id: id, actor: seller.account, action: "cipher_posted", at: book.at(), source, cipher_hash: contentHash(sold.ciphertext) };
   await book.notice(id, posted, signJsonNotice(book.contract, posted, seller.secretKey));
   const { release, signature } = createRelease({
-    circle: book.contract, license_hash: sold.docHash, buyer: buyer.account, buyerPublicKey: buyer.publicKey, content_hash: sold.doc.content_hash, content_size: sold.plain.length, ciphertext: sold.ciphertext,
+    circle: book.contract, license_hash: sold.docHash, buyer: buyer.account, buyerPublicKey: buyer.publicKey, content_hash: sold.doc.content_hash, content_size: sold.plain.length, purchase_id: id, ciphertext: sold.ciphertext,
     contentKey: sold.key, at: book.at(), sellerSecretKey: seller.secretKey as string,
   });
   return book.notice(id, release, signature);
@@ -113,7 +113,7 @@ export async function receiveLicense(book: LicenseBook, buyer: LicenseActor, id:
   } catch (e) {
     return { outcome: "refused", reason: e instanceof Error ? e.message : String(e) };
   }
-  const verdict = verifyDelivery({ ciphertext, release: view.release, signature: view.releaseSignature, sellerPublicKey, buyerSecretKey: buyer.secretKey as string });
+  const verdict = verifyDelivery({ ciphertext, release: view.release, signature: view.releaseSignature, sellerPublicKey, buyerSecretKey: buyer.secretKey as string, purchaseId: id });
   const notify = async (action: "confirmed" | "disputed", reason: string | null, proof: object | null) => {
     const notice = { circle: book.contract, purchase_id: id, actor: buyer.account, action, at: book.at(), reason, proof };
     return book.notice(id, notice, signJsonNotice(book.contract, notice, buyer.secretKey));
