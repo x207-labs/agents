@@ -31,28 +31,28 @@ const ctx = (over: Partial<DecisionContext> & { value?: string; round?: number; 
   ...(over.ownLastValue ? { ownLastValue: over.ownLastValue } : {}),
 });
 
-describe("AG-016 aturan keputusan (mode mock)", () => {
-  it("penjual menerima di atas lantai 90, tawar balik di antara 50 dan 90, menolak di bawah 50", () => {
+describe("AG-016 decision rules (mock mode)", () => {
+  it("the seller accepts above floor 90, counters between 50 and 90, rejects below 50", () => {
     expect(decideRule(ctx({ value: C(90) }))).toEqual({ action: "accept" });
     expect(decideRule(ctx({ value: C(97) }))).toEqual({ action: "accept" });
     expect(decideRule(ctx({ value: C(85) }))).toEqual({ action: "counter", value: C(95) });
     expect(decideRule(ctx({ value: C(40) }))).toEqual({ action: "reject", reason: "too_low" });
   });
 
-  it("penjual tidak pernah menawar balik di bawah lantai dan konsesi naik per ronde", () => {
+  it("the seller never counters below the floor and the concession rises per round", () => {
     expect(decideRule(ctx({ value: C(80), round: 3 }))).toEqual({ action: "counter", value: C(95) });
     expect(decideRule(ctx({ value: C(80), round: 5 }))).toEqual({ action: "counter", value: C(90) });
     expect(decideRule(ctx({ value: C(80), round: 6 }))).toEqual({ action: "reject", reason: "max_rounds" });
   });
 
-  it("penolakan: bayar tanpa accept_payment, listing kedaluwarsa, jumlah melebihi listing", () => {
+  it("rejections: pay without accept_payment, expired listing, amount above the listing", () => {
     const c = ctx({ mode: "pay" });
     expect(decideRule({ ...c, listing: { ...c.listing, accept_payment: false } })).toEqual({ action: "reject", reason: "payment_not_accepted" });
     expect(decideRule({ ...c, listing: { ...c.listing, expires_at: NOW } })).toEqual({ action: "reject", reason: "listing_expired" });
     expect(decideRule({ ...c, offer: { ...c.offer, quantity: 11 } })).toEqual({ action: "reject", reason: "quantity_exceeds_listing" });
   });
 
-  it("penawar menerima di bawah plafon 92, menaikkan tawaran per ronde sampai plafon, menolak di batas ronde", () => {
+  it("the bidder accepts below ceiling 92, raises the offer per round up to the ceiling, rejects at the round limit", () => {
     expect(decideRule(ctx({ role: "buyer", value: C(92), round: 2 }))).toEqual({ action: "accept" });
     expect(decideRule(ctx({ role: "buyer", value: C(95), round: 2, ownLastValue: C(85) }))).toEqual({ action: "counter", value: C(90) });
     expect(decideRule(ctx({ role: "buyer", value: C(95), round: 4, ownLastValue: C(90) }))).toEqual({ action: "counter", value: C(92) });
@@ -60,35 +60,35 @@ describe("AG-016 aturan keputusan (mode mock)", () => {
   });
 });
 
-describe("AG-016 mode LLM tunduk pada kebijakan", () => {
+describe("AG-016 LLM mode obeys the policy", () => {
   const llm = (answer: string, mode: LlmClient["mode"] = "live"): LlmClient & { calls: number } => {
     const client = { mode, model: "m", calls: 0, async complete() { client.calls += 1; return answer; } };
     return client;
   };
 
-  it("mode mock tidak memanggil model", async () => {
+  it("mock mode does not call the model", async () => {
     const fake = llm('{"action":"accept"}', "mock");
     expect(await decide(ctx({ value: C(85) }), fake)).toMatchObject({ action: "counter", source: "rule" });
     expect(fake.calls).toBe(0);
   });
 
-  it("usulan model yang sah dipakai", async () => {
+  it("a valid model proposal is used", async () => {
     const reply = `ok: {"action":"counter","value":"${C(93)}"}`;
     expect(await decide(ctx({ value: C(85) }), llm(reply))).toEqual({ action: "counter", value: C(93), source: "llm" });
   });
 
-  it("usulan yang melanggar lantai atau berbentuk salah dibuang", async () => {
+  it("a proposal that breaks the floor or is malformed is discarded", async () => {
     expect(await decide(ctx({ value: C(85) }), llm('{"action":"accept"}'))).toMatchObject({ action: "counter", value: C(95), source: "rule" });
     expect(await decide(ctx({ value: C(85) }), llm(`{"action":"counter","value":"${C(60)}"}`))).toMatchObject({ source: "rule" });
-    expect(await decide(ctx({ value: C(85) }), llm("saya tidak tahu"))).toMatchObject({ action: "counter", source: "rule" });
+    expect(await decide(ctx({ value: C(85) }), llm("I do not know"))).toMatchObject({ action: "counter", source: "rule" });
     expect(await decide(ctx({ value: C(85) }), llm('{"action":"dance"}'))).toMatchObject({ source: "rule" });
   });
 });
 
-describe("AG-016 listing dari barang dan kebutuhan", () => {
+describe("AG-016 listing from a holding and a need", () => {
   const identity = { accountId: acct("translator"), voucherSecretKey: "ed25519:x", voucherPublicKey: "ed25519:y", policy: { maxPerCall: "1", maxPerEpoch: "1" } } as const;
 
-  it("nilai = harga satuan × jumlah dan parameter mengikuti kebijakan", () => {
+  it("value = unit price × quantity and the parameters follow the policy", () => {
     const listing = buildListing({ identity: { ...identity, voucherSecretKey: "ed25519:x" }, contractId: CONTRACT, policy: sellerPolicy, now: NOW, nonce: "n 1" });
     expect(listing).toMatchObject({
       account: acct("translator"), offer: { asset_type: "translate-calls", quantity: 10, value: C(100) }, want: { asset_type: "summarize-calls", value: C(100) },
@@ -97,14 +97,14 @@ describe("AG-016 listing dari barang dan kebutuhan", () => {
     expect(listingHash(listing)).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("tanpa barang atau kebutuhan, atau kelas X, gagal", () => {
+  it("without a holding or a need, or with class X, fails", () => {
     const args = { identity, contractId: CONTRACT, now: NOW, nonce: "n" };
-    expect(() => buildListing({ ...args, policy: DEFAULT_BARTER_POLICY })).toThrow(/barang/);
-    expect(() => buildListing({ ...args, policy: { ...sellerPolicy, needs: [] } })).toThrow(/kebutuhan/);
-    expect(() => buildListing({ ...args, policy: { ...sellerPolicy, holdings: [{ assetType: "plan", assetClass: "X" as "A", quantity: 1, unitValue: "1" }] } })).toThrow(/kelas aset X/);
+    expect(() => buildListing({ ...args, policy: DEFAULT_BARTER_POLICY })).toThrow(/no holding/);
+    expect(() => buildListing({ ...args, policy: { ...sellerPolicy, needs: [] } })).toThrow(/no need/);
+    expect(() => buildListing({ ...args, policy: { ...sellerPolicy, holdings: [{ assetType: "plan", assetClass: "X" as "A", quantity: 1, unitValue: "1" }] } })).toThrow(/asset class X/);
   });
 
-  it("matchesPolicy: barter bila agent punya yang dicari listing, bayar bila tidak, null untuk listing sendiri", () => {
+  it("matchesPolicy: barter when the agent has what the listing seeks, pay when not, null for its own listing", () => {
     const view = { account: acct("translator"), offer: { assetType: "translate-calls", assetClass: "D", quantity: 10, value: C(100) }, want: { assetType: "summarize-calls", assetClass: "D", quantity: 10, value: C(100) } };
     expect(matchesPolicy(view, acct("summarizer"), buyerPolicy)).toBe("barter");
     expect(matchesPolicy(view, acct("summarizer"), { ...buyerPolicy, holdings: [] })).toBe("pay");
@@ -113,11 +113,11 @@ describe("AG-016 listing dari barang dan kebutuhan", () => {
   });
 });
 
-describe.skipIf(!BACKEND_AVAILABLE)("AG-016 negosiasi dua agent lewat buku", () => {
+describe.skipIf(!BACKEND_AVAILABLE)("AG-016 two-agent negotiation through the book", () => {
   let market: MarketBook | undefined;
   afterEach(async () => market?.stop());
 
-  it("TC-AG-016-01 listing, tawaran 85, balik 95, balik 90, diterima menjadi bundle yang ditandatangani kedua pihak", async () => {
+  it("TC-AG-016-01 listing, offer 85, counter 95, counter 90, accepted becomes a bundle signed by both sides", async () => {
     market = await startMarketBook(["translator", "summarizer"], { now: NOW * 1000 });
     const m = market;
     const make = (name: string, policy: BarterPolicy) => new PolicyAgent({ identity: m.identities[name]!, book: m.book, contractId: CONTRACT, policy, now: () => NOW });
@@ -129,7 +129,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-016 negosiasi dua agent lewat buku", () 
 
     const bids = await budi.shop();
     expect(bids).toMatchObject([{ kind: "bid", mode: "barter", value: C(85) }]);
-    expect(await budi.shop()).toEqual([]); // tidak menawar dua kali
+    expect(await budi.shop()).toEqual([]); // does not bid twice
 
     const r2 = await andi.handleInbox();
     expect(r2).toMatchObject([{ kind: "countered", round: 2, value: C(95) }]);
@@ -148,7 +148,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-016 negosiasi dua agent lewat buku", () 
     expect(leg("translator", "summarizer")).toBe(C(109));
   });
 
-  it("TC-AG-016-02 tawaran jauh di bawah batas bawah ditolak penjual tanpa tawar balik", async () => {
+  it("TC-AG-016-02 an offer far below the floor is rejected by the seller without a counter", async () => {
     market = await startMarketBook(["translator", "summarizer"], { now: NOW * 1000 });
     const m = market;
     const andi = new PolicyAgent({ identity: m.identities.translator!, book: m.book, contractId: CONTRACT, policy: sellerPolicy, now: () => NOW });
@@ -158,7 +158,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-016 negosiasi dua agent lewat buku", () 
     expect(await andi.handleInbox()).toMatchObject([{ kind: "rejected", reason: "too_low" }]);
   });
 
-  it("TC-AG-016-03 usulan dengan syarat berbeda dari negosiasi tidak ditandatangani", async () => {
+  it("TC-AG-016-03 a proposal with terms different from the negotiation is not signed", async () => {
     market = await startMarketBook(["translator", "summarizer"], { now: NOW * 1000 });
     const m = market;
     const make = (name: string, policy: BarterPolicy) => new PolicyAgent({ identity: m.identities[name]!, book: m.book, contractId: CONTRACT, policy, now: () => NOW });

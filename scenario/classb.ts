@@ -51,9 +51,9 @@ export async function probeKey(call: CallWithKey, key: AccessKey, allowedMethod:
 
 /** Panggilan terlarang memang gagal dan panggilan sah memang jalan; kalau tidak, skenario gagal. */
 export function assertProbe(probe: KeyProbe): void {
-  if (!probe.allowed.ok) throw new Error(`panggilan yang diizinkan gagal: ${probe.allowed.error}`);
-  if (probe.otherMethod.ok) throw new Error("method di luar daftar seharusnya ditolak");
-  if (probe.withFunds.ok) throw new Error("panggilan dengan dana terlampir seharusnya ditolak");
+  if (!probe.allowed.ok) throw new Error(`the allowed call failed: ${probe.allowed.error}`);
+  if (probe.otherMethod.ok) throw new Error("a method outside the list should be rejected");
+  if (probe.withFunds.ok) throw new Error("a call with attached funds should be rejected");
 }
 
 /** Satu hari sewa dalam milidetik, untuk menghitung `expires_at` dan `paidUntil`. */

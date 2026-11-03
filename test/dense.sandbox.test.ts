@@ -6,13 +6,13 @@ import { hasCycleThroughAll, planDensePayments } from "../scenario/dense.ts";
 import { sandboxAvailable } from "../../sdk/test-support/sandbox.ts";
 import { startStack, type Stack } from "./stack.ts";
 
-describe.skipIf(!sandboxAvailable)("AG-009 skenario padat enam agent", () => {
+describe.skipIf(!sandboxAvailable)("AG-009 dense six-agent scenario", () => {
   let stack: Stack;
   afterAll(async () => {
     await stack?.stop();
   });
 
-  it("300 pembayaran sukses, keenam agent pembeli dan penjual, siklus melewati keenam agent setelah close_epoch", async () => {
+  it("300 payments succeed, all six agents are buyer and seller, a cycle passes through all six agents after close_epoch", async () => {
     stack = await startStack();
     const { fx, identity, urls } = stack;
     const buyers = Object.fromEntries(AGENT_NAMES.map((n) => [n, createAgentBuyer(identity[n], { rpcUrls: [fx.sandbox.rpcUrl] })]));
@@ -20,7 +20,7 @@ describe.skipIf(!sandboxAvailable)("AG-009 skenario padat enam agent", () => {
 
     let ok = 0;
     for (const { buyer, seller } of plan) {
-      const response = await buyers[buyer]!(`${urls[seller]}/api/${AGENTS[seller].verb}?input=halo`);
+      const response = await buyers[buyer]!(`${urls[seller]}/api/${AGENTS[seller].verb}?input=hello`);
       if (response.status === 200) ok += 1;
       else throw new Error(`${buyer} -> ${seller}: HTTP ${response.status} ${await response.text()}`);
     }

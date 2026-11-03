@@ -4,11 +4,11 @@ import { acct, BACKEND_AVAILABLE, CONTRACT, startMarketBook, type MarketBook } f
 
 const START = Date.parse("2026-11-04T10:00:00Z");
 
-describe.skipIf(!BACKEND_AVAILABLE)("AG-017 listing menunggu lintas waktu", () => {
+describe.skipIf(!BACKEND_AVAILABLE)("AG-017 a listing waits across time", () => {
   let market: MarketBook | undefined;
   afterEach(async () => market?.stop());
 
-  it("TC-AG-017-01 listing menunggu dua jam tanpa lawan, lawan datang, negosiasi, lalu bundle ready", async () => {
+  it("TC-AG-017-01 a listing waits two hours without a counterparty, the counterparty arrives, negotiation, then bundle ready", async () => {
     market = await startMarketBook(["translator", "summarizer"], { now: START });
     const m = market;
     const clock = { now: Math.floor(START / 1000) };

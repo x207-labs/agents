@@ -57,7 +57,7 @@ export class RentLessee {
     const asked = await this.#fetch(url, { method: "POST", body });
     const requirements = (await this.#json(asked)) as { accepts?: Array<{ scheme: string }> };
     const accepted = requirements.accepts?.find((a) => a.scheme === "batch-settlement");
-    if (asked.status !== 402 || accepted === undefined) throw new RentError(asked.status, "no_payment_requirements", "broker tidak meminta pembayaran satu hari");
+    if (asked.status !== 402 || accepted === undefined) throw new RentError(asked.status, "no_payment_requirements", "the broker did not ask for a one-day payment");
     const voucher = this.daily.signDay({ day: args.day, epoch: args.epoch, state: args.state });
     const { signature, ...unsigned } = voucher;
     const header = Buffer.from(JSON.stringify({ x402Version: 2, accepted, payload: { voucher: unsigned, signature } })).toString("base64");

@@ -9,7 +9,7 @@ import { onboardAgents } from "./onboard.ts";
 
 const required = (name: string): string => {
   const value = process.env[name];
-  if (!value) throw new Error(`variabel ${name} wajib diisi`);
+  if (!value) throw new Error(`variable ${name} is required`);
   return value;
 };
 

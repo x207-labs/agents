@@ -10,7 +10,7 @@ import { onboardAgents } from "../onboarding/onboard.ts";
 import { loadIdentity } from "../shared/identity.ts";
 import { AGENT_NAMES } from "../shared/registry.ts";
 
-describe.skipIf(!sandboxAvailable)("AG-004 enam agent di near-sandbox", () => {
+describe.skipIf(!sandboxAvailable)("AG-004 six agents on near-sandbox", () => {
   let fx: CircleFixture;
   const keysDir = mkdtempSync(join(tmpdir(), "x207-agents-keys-"));
   afterAll(async () => {
@@ -18,7 +18,7 @@ describe.skipIf(!sandboxAvailable)("AG-004 enam agent di near-sandbox", () => {
     await fx?.stop();
   });
 
-  it("TC-AG-004-01..05 enam agent active, kunci voucher terpisah dan bukan access key", async () => {
+  it("TC-AG-004-01..05 six agents active, voucher key separate and not an access key", async () => {
     fx = await deployCircle();
     const view = createCircleViewFn({ circleContract: fx.circle.accountId, rpcUrls: [fx.sandbox.rpcUrl] });
     const accounts = await Promise.all(AGENT_NAMES.map((name) => fx.member(name)));

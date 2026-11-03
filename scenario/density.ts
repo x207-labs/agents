@@ -24,7 +24,7 @@ export function edgesFor(level: Density): Payment[] {
 /** `count` pembayaran: tiap edge sekali, sisanya acak dari edge tingkat itu menurut seed. */
 export function planDensity(level: Density, count: number, seed: number): Payment[] {
   const edges = edgesFor(level);
-  if (count < edges.length) throw new Error(`count harus minimal ${edges.length} untuk tingkat ${level}`);
+  if (count < edges.length) throw new Error(`count must be at least ${edges.length} for level ${level}`);
   const random = prng(seed);
   return [...edges, ...Array.from({ length: count - edges.length }, () => edges[Math.floor(random() * edges.length)]!)];
 }

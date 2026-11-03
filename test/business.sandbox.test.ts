@@ -7,13 +7,13 @@ import { createAgentBuyer } from "../shared/x207.ts";
 import { sandboxAvailable } from "../../sdk/test-support/sandbox.ts";
 import { startStack, type Stack } from "./stack.ts";
 
-describe.skipIf(!sandboxAvailable)("AG-020 pengadaan di near-sandbox", () => {
+describe.skipIf(!sandboxAvailable)("AG-020 procurement on near-sandbox", () => {
   let stack: Stack;
   afterAll(async () => {
     await stack?.stop();
   });
 
-  it("pembelian dalam batas menjadi kewajiban on-chain, pembelian di luar batas tidak", async () => {
+  it("a purchase within limits becomes an on-chain obligation, a purchase outside limits does not", async () => {
     stack = await startStack();
     const { fx, identity, urls } = stack;
     const service = (name: "translator" | "summarizer" | "cleaner", maxPrice: string) => ({ name: AGENTS[name].verb, url: urls[name], path: `/api/${AGENTS[name].verb}`, maxPrice });
@@ -25,12 +25,12 @@ describe.skipIf(!sandboxAvailable)("AG-020 pengadaan di near-sandbox", () => {
     });
 
     const results = [
-      await agent.buy("translate", "halo"),
-      await agent.buy("summarize", "halo"),
-      await agent.buy("image", "halo"),
-      await agent.buy("clean", "halo"),
-      await agent.buy("translate", "halo"),
-      await agent.buy("clean", "halo"),
+      await agent.buy("translate", "hello"),
+      await agent.buy("summarize", "hello"),
+      await agent.buy("image", "hello"),
+      await agent.buy("clean", "hello"),
+      await agent.buy("translate", "hello"),
+      await agent.buy("clean", "hello"),
     ];
     expect(results.map((r) => (r.ok ? "ok" : r.reason))).toEqual([
       "ok", "price_above_service_limit", "service_not_allowed", "ok", "ok", "over_epoch_budget",
@@ -43,7 +43,7 @@ describe.skipIf(!sandboxAvailable)("AG-020 pengadaan di near-sandbox", () => {
       fx.sandbox.view<{ cumulative: string } | null>(fx.circle.accountId, "obligation", { epoch, debtor: identity.gpu.accountId, creditor: identity[creditor].accountId });
     expect((await edge("translator"))?.cumulative).toBe("40000");
     expect((await edge("cleaner"))?.cumulative).toBe("20000");
-    expect(await edge("summarizer")).toBeNull(); // ditolak sebelum pembayaran: tidak ada voucher, tidak ada edge
+    expect(await edge("summarizer")).toBeNull(); // rejected before payment: no voucher, no edge
     expect(agent.spent).toBe(60_000n);
   }, 600_000);
 });

@@ -4,10 +4,10 @@ import { buildInvoiceVouchers, credit, edgesOf, formatNetting, invoiceHash, invo
 
 const B = { supplier: "supplier.x207-circle.near", maker: "maker.x207-circle.near", retailer: "retailer.x207-circle.near" };
 
-describe("AG-021 invoice menjadi voucher dan netting", () => {
+describe("AG-021 invoices become vouchers and netting", () => {
   const invoices = sampleInvoices(B);
 
-  it("hash invoice deterministik dan peka terhadap isi; resource memuat hash saja", () => {
+  it("the invoice hash is deterministic and sensitive to content; the resource holds the hash only", () => {
     const h = invoiceHash(invoices[0]!);
     expect(h).toMatch(/^[0-9a-f]{64}$/);
     expect(invoiceHash({ ...invoices[0]! })).toBe(h);
@@ -17,7 +17,7 @@ describe("AG-021 invoice menjadi voucher dan netting", () => {
     expect(invoiceResource(invoices[0]!)).not.toContain("components");
   });
 
-  it("satu voucher kumulatif per invoice, ditandatangani debitur, resource = hash invoice", () => {
+  it("one cumulative voucher per invoice, signed by the debtor, resource = invoice hash", () => {
     const keys = Object.fromEntries(Object.values(B).map((a) => [a, generateVoucherKeypair()]));
     const vouchers = buildInvoiceVouchers({ circle: "x207-circle.near", epoch: 7, invoices, secretKeys: Object.fromEntries(Object.entries(keys).map(([a, k]) => [a, k.secretKey])) });
     expect(vouchers).toHaveLength(3);
@@ -27,7 +27,7 @@ describe("AG-021 invoice menjadi voucher dan netting", () => {
     }
   });
 
-  it("invoice kedua untuk pasangan yang sama menaikkan seq dan cumulative; yang didaftarkan voucher terakhir", () => {
+  it("a second invoice for the same pair raises seq and cumulative; the last voucher is the one registered", () => {
     const extra: Invoice = { id: "INV-2026-004", issuer: B.supplier, debtor: B.maker, amount: credit(25), memo: "spare parts" };
     const keys = { [B.maker]: generateVoucherKeypair(), [B.supplier]: generateVoucherKeypair(), [B.retailer]: generateVoucherKeypair() };
     const all = buildInvoiceVouchers({
@@ -42,11 +42,11 @@ describe("AG-021 invoice menjadi voucher dan netting", () => {
     expect(edgesOf([...invoices, extra]).find((e) => e.debtor === B.maker)!.amount).toBe(125_000_000n);
   });
 
-  it("tanpa kunci debitur, gagal", () => {
-    expect(() => buildInvoiceVouchers({ circle: "c", epoch: 1, invoices, secretKeys: {} })).toThrow(/kunci voucher/);
+  it("without a debtor key, fails", () => {
+    expect(() => buildInvoiceVouchers({ circle: "c", epoch: 1, invoices, secretKeys: {} })).toThrow(/no voucher key/);
   });
 
-  it("netting cincin 100/60/80: dihapus 60 per edge (180), sisa 60, posisi bersih tetap", () => {
+  it("ring netting 100/60/80: 60 removed per edge (180), 60 left, net position unchanged", () => {
     const n = netInvoices(invoices);
     expect(n.before).toBe(240_000_000n);
     expect(n.cleared).toBe(180_000_000n);
@@ -66,14 +66,14 @@ describe("AG-021 invoice menjadi voucher dan netting", () => {
     expect(fromResidual).toEqual(n.net);
   });
 
-  it("tanpa siklus tidak ada yang dihapus", () => {
+  it("without a cycle nothing is removed", () => {
     const chain = invoices.slice(0, 2);
     const n = netInvoices(chain);
     expect(n.cleared).toBe(0n);
     expect(n.after).toBe(n.before);
   });
 
-  it("laporan mencetak total sebelum dan sesudah", () => {
+  it("the report prints the total before and after", () => {
     expect(formatNetting(netInvoices(invoices))).toEqual([
       "invoice total before netting: 240 credit",
       "cleared by cycle netting:    180 credit",

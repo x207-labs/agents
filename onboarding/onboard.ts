@@ -37,11 +37,11 @@ export async function onboardAgents(options: OnboardOptions): Promise<OnboardOut
     const stored = loadIdentity(options.keysDir, options.network, agent.accountId);
     const member = (await options.view("member", { account_id: agent.accountId })) as { status: string } | null;
     if (member?.status === "active" && stored) {
-      log(`${agent.accountId}: sudah active`);
+      log(`${agent.accountId}: already active`);
       outcomes.push({ identity: stored, status: "already_active" });
       continue;
     }
-    if (member) throw new Error(`${agent.accountId} sudah terdaftar dengan status ${member.status}; onboarding tidak bisa diulang dari awal`);
+    if (member) throw new Error(`${agent.accountId} is already registered with status ${member.status}; onboarding cannot be restarted from scratch`);
 
     const result = await onboardMember(
       {

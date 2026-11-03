@@ -41,13 +41,13 @@ export function findViolations(rootDir) {
         if (specifier.startsWith(".")) {
           const target = resolve(dirname(file), specifier);
           if (target !== root && !target.startsWith(root + sep)) {
-            violations.push({ file: where, specifier, reason: "import relatif keluar dari repo agents" });
+            violations.push({ file: where, specifier, reason: "relative import leaves the agents repo" });
           }
           continue;
         }
         if (specifier.startsWith("@x207/") || specifier.startsWith("@x402/")) {
           if (!PUBLIC.has(specifier)) {
-            violations.push({ file: where, specifier, reason: "bukan paket publik (@x402/fetch, @x207/scheme, @x207/core)" });
+            violations.push({ file: where, specifier, reason: "not a public package (@x402/fetch, @x207/scheme, @x207/core)" });
           }
         }
       }
@@ -61,5 +61,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const violations = findViolations(root);
   for (const v of violations) console.error(`${v.file}: import "${v.specifier}" dilarang: ${v.reason}`);
   if (violations.length > 0) process.exit(1);
-  console.log("import agent hanya memakai paket publik");
+  console.log("agents imports use public packages only");
 }

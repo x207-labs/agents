@@ -153,10 +153,10 @@ export function buildListing(args: {
 }): Listing {
   const holding = args.policy.holdings[args.holding ?? 0];
   const need = args.policy.needs[args.need ?? 0];
-  if (!holding) throw new Error("kebijakan tidak punya barang untuk dilisting");
-  if (!need) throw new Error("kebijakan tidak punya kebutuhan untuk dicari");
+  if (!holding) throw new Error("the policy has no holding to list");
+  if (!need) throw new Error("the policy has no need to look for");
   for (const item of [holding, need]) {
-    if (!(ASSET_CLASSES as readonly string[]).includes(item.assetClass)) throw new Error(`kelas aset ${item.assetClass} tidak boleh dilisting`);
+    if (!(ASSET_CLASSES as readonly string[]).includes(item.assetClass)) throw new Error(`asset class ${item.assetClass} cannot be listed`);
   }
   return {
     circle: args.contractId,
@@ -395,7 +395,7 @@ export class PolicyAgent {
     const seeker = referral ? { searcher: referral.searcher, searcherShareBps: referral.searcherShareBps } : {};
     const preview = await this.book.previewAccept(listingHashHex, offerHashHex, { account, ...seeker });
     if (!preview.bundle) return this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch, ...seeker });
-    if (termsHash(preview.bundle.terms) !== preview.bundle.termsHash) throw new Error("terms_hash dari server tidak cocok dengan syarat bundle");
+    if (termsHash(preview.bundle.terms) !== preview.bundle.termsHash) throw new Error("terms_hash from the server does not match the bundle terms");
     const { signature } = signBundle(preview.bundle.terms, account, this.identity.voucherSecretKey);
     return this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch, signature, ...seeker });
   }

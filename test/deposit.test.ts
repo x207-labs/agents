@@ -12,8 +12,8 @@ function* files(dir: string): Generator<string> {
   }
 }
 
-describe("AG-007 agent tidak mengirim transaksi berdeposit", () => {
-  it("TC-AG-007-02 review kode: folder agent, shared, dan scenario tidak mengirim transaksi atau memakai deposit", () => {
+describe("AG-007 agents do not send transactions with a deposit", () => {
+  it("TC-AG-007-02 code review: the agent, shared and scenario folders send no transaction and use no deposit", () => {
     const offenders: string[] = [];
     for (const dir of ["agents", "shared", "scenario"]) {
       for (const file of files(join(root, dir))) {
@@ -24,7 +24,7 @@ describe("AG-007 agent tidak mengirim transaksi berdeposit", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("TC-AG-007-03 stake dikirim lewat onboarding yang ditandatangani kunci pemilik, bukan kunci voucher", () => {
+  it("TC-AG-007-03 stake is sent through onboarding signed by the owner key, not the voucher key", () => {
     const run = readFileSync(join(root, "onboarding/run.ts"), "utf8");
     expect(run).toMatch(/createNearSender\(\{ rpcUrl, accountId, secretKey: ownerKey\(accountId\) \}\)/);
     expect(run).not.toMatch(/voucherSecretKey/);

@@ -78,12 +78,12 @@ export class InvoiceBook {
   /** Debtor menyetujui: memeriksa hash dan jadwal terhadap rencana SDK, lalu menandatangani semua voucher cicilan sekaligus (seq 1 di epochnya). */
   async approve(hash: string, debtor: InvoiceActor): Promise<InvoiceState> {
     const view = await this.get(hash);
-    if (invoiceHash(view.document) !== view.invoiceHash) throw new Error("hash invoice tidak cocok dengan dokumennya: tidak ditandatangani");
+    if (invoiceHash(view.document) !== view.invoiceHash) throw new Error("invoice hash does not match its document: not signed");
     const first = view.installments[0];
-    if (!first) throw new Error("invoice tanpa jadwal cicilan");
+    if (!first) throw new Error("invoice without an installment schedule");
     const plan = planInstallments({ circle: this.contract, doc: view.document, firstEpoch: first.epoch, count: view.installments.length });
     const same = plan.installments.every((p, k) => view.installments[k]?.epoch === p.epoch && view.installments[k]?.amount === p.amount);
-    if (!same) throw new Error("jadwal dari buku tidak sama dengan rencana SDK: tidak ditandatangani");
+    if (!same) throw new Error("the schedule from the book differs from the SDK plan: not signed");
     const vouchers = plan.installments.map((p) => {
       const voucher = installmentVoucher(plan, p.index);
       return { voucher, signature: signVoucher(voucher, debtor.secretKey).signature };

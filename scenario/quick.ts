@@ -83,7 +83,7 @@ export async function runQuickBarter(args: {
     bot.record(plan.to, now());
   }
   const answers = [...(await budi.handleReferrals()), ...(await citra.handleReferrals())];
-  if (answers.some((a) => a.action !== "bid")) throw new Error(`ajakan ditolak: ${JSON.stringify(answers)}`);
+  if (answers.some((a) => a.action !== "bid")) throw new Error(`referral rejected: ${JSON.stringify(answers)}`);
   await andiPay.handleInbox();
   for (const agent of [andiPay, budi, citra, seeker]) await agent.signProposals();
 

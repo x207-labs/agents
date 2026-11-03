@@ -24,7 +24,7 @@ const ringTerms = (epoch = 42, amounts = [100, 100, 100]): BundleTerms => ({
   ],
 });
 
-describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need dan usulan bundle", () => {
+describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need and bundle proposals", () => {
   let market: MarketBook | undefined;
   afterEach(async () => market?.stop());
 
@@ -36,7 +36,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need dan usulan bundle"
     return { m: market, agents };
   }
 
-  it("TC-AG-012-01 tiga agent memasang intent; buku menyimpan dan hash cocok", async () => {
+  it("TC-AG-012-01 three agents post intents; the book stores them and the hash matches", async () => {
     const { m, agents } = await setup();
     for (const r of RING) {
       const { intent, view } = await agents.get(r.name)!.postIntent(r.offer, r.need);
@@ -49,7 +49,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need dan usulan bundle"
     expect(open[0]).toMatchObject({ offer: RING[0].offer, need: RING[0].need });
   });
 
-  it("TC-AG-012-02 usulan yang cocok dengan intent ditandatangani semua agent sampai ready", async () => {
+  it("TC-AG-012-02 a proposal that matches the intents is signed by every agent until ready", async () => {
     const { m, agents } = await setup();
     for (const r of RING) await agents.get(r.name)!.postIntent(r.offer, r.need);
     const hash = await m.injectProposal(ringTerms());
@@ -63,7 +63,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need dan usulan bundle"
     expect(await agents.get("translator")!.answerProposals()).toEqual([]);
   });
 
-  it("TC-AG-012-03 usulan yang tidak cocok ditolak dan tidak ditandatangani", async () => {
+  it("TC-AG-012-03 a proposal that does not match is rejected and not signed", async () => {
     const { m, agents } = await setup();
     for (const r of RING) await agents.get(r.name)!.postIntent(r.offer, r.need);
     // translator harus membayar 120 padahal kebutuhannya bernilai 100
@@ -80,7 +80,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need dan usulan bundle"
     expect(answers.find((a) => a.termsHash === underpaid)).toEqual({ termsHash: underpaid, action: "rejected", reason: "underpaid" });
   });
 
-  it("TC-AG-012-05 signTerms: tanda tangan untuk syarat yang cocok, null untuk yang tidak (permintaan langsung solver)", async () => {
+  it("TC-AG-012-05 signTerms: a signature for matching terms, null for the rest (direct solver request)", async () => {
     const { m, agents } = await setup();
     for (const r of RING) await agents.get(r.name)!.postIntent(r.offer, r.need);
     const translator = agents.get("translator")!;
@@ -88,11 +88,11 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need dan usulan bundle"
     expect(good).toMatchObject({ account: acct("translator") });
     const { verifyBundleSignature } = await import("@x207/core");
     expect(verifyBundleSignature(ringTerms(), good!.signature, m.identities.translator!.voucherPublicKey)).toBe(true);
-    expect(await translator.signTerms(ringTerms(42, [120, 100, 100]))).toBeNull(); // membayar lebih dari kebutuhan
-    expect(await translator.signTerms(ringTerms(41))).toBeNull(); // bukan epoch open
+    expect(await translator.signTerms(ringTerms(42, [120, 100, 100]))).toBeNull(); // pays more than the need
+    expect(await translator.signTerms(ringTerms(41))).toBeNull(); // not the open epoch
   });
 
-  it("TC-AG-012-06 solver mengirim usulan lewat POST bundle-proposals dan agent menandatanganinya sampai ready", async () => {
+  it("TC-AG-012-06 the solver sends a proposal through POST bundle-proposals and the agents sign it until ready", async () => {
     const { m, agents } = await setup();
     for (const r of RING) await agents.get(r.name)!.postIntent(r.offer, r.need);
     const created = await m.book.postBundleProposal(ringTerms());
@@ -103,7 +103,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need dan usulan bundle"
     await expect(m.book.postBundleProposal(ringTerms(41))).rejects.toMatchObject({ code: "epoch_not_open" });
   });
 
-  it("TC-AG-012-04 epoch bukan epoch open ditolak", async () => {
+  it("TC-AG-012-04 an epoch that is not the open epoch is rejected", async () => {
     const { m, agents } = await setup();
     for (const r of RING) await agents.get(r.name)!.postIntent(r.offer, r.need);
     const stale = await m.injectProposal(ringTerms(41));
@@ -118,16 +118,16 @@ describe("AG-012 evaluateProposal", () => {
   const check = (terms: BundleTerms, intents: BarterIntent[], over: Partial<Parameters<typeof evaluateProposal>[0]> = {}, hash = termsHash(terms)) =>
     evaluateProposal({ account: acct("translator"), proposal: { termsHash: hash, terms }, intents, now: NOW, ...over });
 
-  it("cocok: menerima sebesar offer dan membayar sebesar need", () => {
+  it("match: receives the offer amount and pays the need amount", () => {
     expect(check(ringTerms(), [intent()])).toEqual({ ok: true, intentHash: intentHash(intent()) });
     expect(check(ringTerms(42, [90, 100, 150]), [intent()])).toMatchObject({ ok: true });
   });
 
-  it("hash yang tidak sama dengan hasil hitung syarat ditolak", () => {
+  it("a hash that differs from the computed terms hash is rejected", () => {
     expect(check(ringTerms(), [intent()], {}, "0".repeat(64))).toEqual({ ok: false, reason: "terms_hash_mismatch" });
   });
 
-  it("alasan penolakan: bukan peserta, epoch, tanpa intent, intent kedaluwarsa, lingkaran, tanpa leg", () => {
+  it("rejection reasons: not a participant, epoch, no intent, expired intent, circle, no leg", () => {
     expect(check(ringTerms(), [intent()], { account: acct("gpu") })).toEqual({ ok: false, reason: "not_participant" });
     expect(check(ringTerms(41), [intent()], { openEpoch: 42 })).toEqual({ ok: false, reason: "epoch_mismatch" });
     expect(check(ringTerms(41), [intent()], { openEpoch: null })).toMatchObject({ ok: true });
@@ -141,7 +141,7 @@ describe("AG-012 evaluateProposal", () => {
     expect(check(onlyPays, [intent()])).toEqual({ ok: false, reason: "no_leg" });
   });
 
-  it("memilih intent kedua bila yang pertama tidak cocok", () => {
+  it("picks the second intent when the first does not match", () => {
     const small = intent({ offer: side("translate", 500), need: side("summarize", 50), nonce: "small" });
     const good = intent({ nonce: "good" });
     expect(check(ringTerms(), [small, good])).toEqual({ ok: true, intentHash: intentHash(good) });

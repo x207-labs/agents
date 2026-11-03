@@ -20,12 +20,12 @@ function fixture(files: Record<string, string>): string {
   return root;
 }
 
-describe("AG-006 pemeriksaan import", () => {
-  it("TC-AG-006-01 repo agents saat ini lulus", () => {
+describe("AG-006 import check", () => {
+  it("TC-AG-006-01 the agents repo passes today", () => {
     expect(findViolations(repo)).toEqual([]);
   });
 
-  it("TC-AG-006-02 import ke path internal paket gagal dan pesan menyebut file serta import", () => {
+  it("TC-AG-006-02 an import of an internal package path fails and the message names the file and the import", () => {
     const root = fixture({
       "shared/a.ts": 'import { x } from "@x207/scheme/src/client/index";\nimport { y } from "@x207/core/dist/voucher.js";\n',
     });
@@ -34,13 +34,13 @@ describe("AG-006 pemeriksaan import", () => {
     expect(violations[0]).toMatchObject({ file: join("shared", "a.ts"), specifier: "@x207/scheme/src/client/index" });
   });
 
-  it("TC-AG-006-03 import relatif ke kode repo lain gagal", () => {
+  it("TC-AG-006-03 a relative import into the code of another repo fails", () => {
     const root = fixture({ "agents/a/index.ts": 'import { z } from "../../../sdk/packages/core/src/index.ts";\nimport("../../x.ts");\n' });
     const violations = findViolations(root);
     expect(violations.map((v: { specifier: string }) => v.specifier)).toEqual(["../../../sdk/packages/core/src/index.ts"]);
   });
 
-  it("TC-AG-006-04 hanya import publik, node:, relatif dalam repo, dan pihak ketiga lulus", () => {
+  it("TC-AG-006-04 only public imports, node:, relative inside the repo, and third parties pass", () => {
     const root = fixture({
       "shared/ok.ts":
         'import { createServer } from "node:http";\nimport { wrapFetchWithPayment } from "@x402/fetch";\nimport { x207Middleware } from "@x207/scheme";\n' +

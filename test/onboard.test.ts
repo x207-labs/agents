@@ -18,10 +18,10 @@ const POLICY = { maxPerCall: "100000", maxPerEpoch: "50000000" };
 const CIRCLE = "x207-circle.test.near";
 
 describe("AG-004 onboarding", () => {
-  it("TC-AG-004-06 kebijakan belanja divalidasi dan terbaca saat agent mulai", () => {
+  it("TC-AG-004-06 the spend policy is validated and read when the agent starts", () => {
     expect(parseSpendPolicy(POLICY)).toEqual(POLICY);
     expect(() => parseSpendPolicy({ maxPerCall: "0", maxPerEpoch: "1" })).toThrow(/maxPerCall/);
-    expect(() => parseSpendPolicy({ maxPerCall: "10", maxPerEpoch: "1" })).toThrow(/tidak boleh melebihi/);
+    expect(() => parseSpendPolicy({ maxPerCall: "10", maxPerEpoch: "1" })).toThrow(/must not exceed/);
     const dir = tmp();
     const { secretKey, publicKey } = generateVoucherKeypair();
     saveIdentity(dir, "sandbox", { accountId: "a.test.near", voucherSecretKey: secretKey, voucherPublicKey: publicKey, policy: POLICY });
@@ -30,7 +30,7 @@ describe("AG-004 onboarding", () => {
     expect(loadIdentity(dir, "sandbox", "b.test.near")).toBeNull();
   });
 
-  it("TC-AG-004-F8 berkas kunci dengan bit grup atau pengguna lain ditolak, direktori lama diperketat ke 0700 saat menyimpan (review BE-063)", () => {
+  it("TC-AG-004-F8 a key file with group or other bits is rejected, an old directory is tightened to 0700 on save (review BE-063)", () => {
     const dir = mkdtempSync(join(tmpdir(), "x207-keys-f8-"));
     dirs.push(dir);
     const { publicKey, secretKey } = generateVoucherKeypair();
@@ -49,7 +49,7 @@ describe("AG-004 onboarding", () => {
     expect(statSync(join(dir, "sandbox")).mode & 0o777).toBe(0o700);
   });
 
-  it("enam agent: kunci voucher berbeda, join dan stake dikirim dari akun agent, ulang tidak mengirim apa pun", async () => {
+  it("six agents: distinct voucher keys, join and stake are sent from the agent account, a rerun sends nothing", async () => {
     const dir = tmp();
     const members = new Map<string, { status: string; stake: string; limit: string; pubkey_voucher: string }>();
     const sent: Array<{ account: string; call: ContractCall }> = [];

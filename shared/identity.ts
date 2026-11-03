@@ -24,17 +24,17 @@ export function parseSpendPolicy(raw: unknown): SpendPolicy {
   const value = raw as Partial<SpendPolicy> | null;
   for (const field of ["maxPerCall", "maxPerEpoch"] as const) {
     if (typeof value?.[field] !== "string" || !POSITIVE.test(value[field]!)) {
-      throw new Error(`kebijakan belanja: ${field} harus string bilangan bulat > 0`);
+      throw new Error(`spend policy: ${field} must be an integer string > 0`);
     }
   }
   if (BigInt(value!.maxPerCall!) > BigInt(value!.maxPerEpoch!)) {
-    throw new Error("kebijakan belanja: maxPerCall tidak boleh melebihi maxPerEpoch");
+    throw new Error("spend policy: maxPerCall must not exceed maxPerEpoch");
   }
   return { maxPerCall: value!.maxPerCall!, maxPerEpoch: value!.maxPerEpoch! };
 }
 
 export function loadSpendPolicy(file: string): SpendPolicy {
-  if (!existsSync(file)) throw new Error(`berkas kebijakan belanja tidak ada: ${file}`);
+  if (!existsSync(file)) throw new Error(`spend policy file does not exist: ${file}`);
   return parseSpendPolicy(JSON.parse(readFileSync(file, "utf8")));
 }
 
@@ -57,7 +57,7 @@ export function loadIdentity(keysDir: string, network: string, accountId: string
   // F8 (review BE-063): like ssh, refuse a key file that other users can read or write
   const mode = statSync(file).mode & 0o777;
   if ((mode & 0o077) !== 0) {
-    throw new Error(`berkas kunci agent ${file} terbuka untuk grup atau pengguna lain (mode ${mode.toString(8)}): jalankan chmod 600 dan anggap kunci itu mungkin bocor`);
+    throw new Error(`agent key file ${file} is open to group or other users (mode ${mode.toString(8)}): run chmod 600 and treat the key as possibly leaked`);
   }
   const raw = JSON.parse(readFileSync(file, "utf8")) as AgentIdentity;
   return { ...raw, policy: parseSpendPolicy(raw.policy) };

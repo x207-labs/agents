@@ -81,7 +81,7 @@ export function startAgent(spec: AgentSpec): Server {
   const facilitatorUrl = process.env.FACILITATOR_URL;
   const circleContract = process.env.CIRCLE_CONTRACT;
   if (facilitatorUrl && !circleContract) {
-    console.error(`[${spec.name}] config error: CIRCLE_CONTRACT wajib diisi bila FACILITATOR_URL diisi`);
+    console.error(`[${spec.name}] config error: CIRCLE_CONTRACT is required when FACILITATOR_URL is set`);
     process.exit(1);
   }
   // Tanpa FACILITATOR_URL agent melayani gratis (mode pengembangan AG-003).

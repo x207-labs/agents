@@ -7,11 +7,11 @@ import { acct, BACKEND_AVAILABLE, CONTRACT, startMarketBook, type MarketBook } f
 const C = (n: number) => String(n * 1_000_000);
 const NOW = Math.floor(Date.parse("2026-11-04T10:00:00Z") / 1000);
 
-describe.skipIf(!BACKEND_AVAILABLE)("AG-018 barter cepat dan pencari", () => {
+describe.skipIf(!BACKEND_AVAILABLE)("AG-018 quick barter and the seeker", () => {
   let market: MarketBook | undefined;
   afterEach(async () => market?.stop());
 
-  it("TC-AG-018-01 dua jalur menghasilkan angka tabel note F9: bayar 93 = 90 + 3, barter cashback 7, Andi menanggung 10, pencari 3 + 3", async () => {
+  it("TC-AG-018-01 both paths give the figures of the note F9 table: pay 93 = 90 + 3, barter cashback 7, Andi bears 10, seeker 3 + 3", async () => {
     market = await startMarketBook(["translator", "summarizer", "scraper", "cleaner", "gpu"], { now: NOW * 1000 });
     const m = market;
     const report = await runQuickBarter({
@@ -38,7 +38,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-018 barter cepat dan pencari", () => {
     expect(report.seekerRevenue).toBe(C(6));
   });
 
-  it("TC-AG-018-02 pagar spam pencari: opt-in, idle, batas penawaran per periode, pasangan yang ditolak, jatah di atas diskon", () => {
+  it("TC-AG-018-02 seeker spam fence: opt-in, idle, offer limit per period, rejected pairs, share above the discount", () => {
     const view = (hash: string, over: Partial<ListingView> = {}): ListingView => ({
       listingHash: hash, account: acct("translator"), offer: { assetType: "a", assetClass: "D", quantity: 1, value: C(100) },
       want: { assetType: "b", assetClass: "D", quantity: 1, value: C(100) }, terms: "", detail: "", expiresAt: "2026-11-05T10:00:00Z",
@@ -48,13 +48,13 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-018 barter cepat dan pencari", () => {
     const bot = () => new SeekerBot({ seeker: acct("cleaner"), searcherShareBps: 300, maxOffersPerAgent: 1, periodSeconds: 3600 });
     const listings = [view("a".repeat(64)), view("b".repeat(64))];
 
-    expect(bot().plan(listings, [agent()], NOW)).toHaveLength(1); // batas satu per periode
+    expect(bot().plan(listings, [agent()], NOW)).toHaveLength(1); // limit of one per period
     expect(bot().plan(listings, [agent({ optIn: false })], NOW)).toEqual([]);
     expect(bot().plan(listings, [agent({ idle: false })], NOW)).toEqual([]);
     expect(bot().plan([view("c".repeat(64), { discoverable: false })], [agent()], NOW)).toEqual([]);
-    expect(bot().plan([view("d".repeat(64), { discountBps: 200 })], [agent()], NOW)).toEqual([]); // jatah 3% di atas diskon 2%
+    expect(bot().plan([view("d".repeat(64), { discountBps: 200 })], [agent()], NOW)).toEqual([]); // 3% share above a 2% discount
     expect(bot().plan([view("e".repeat(64), { discountBps: 0 })], [agent()], NOW)).toEqual([]);
-    expect(bot().plan(listings, [agent({ canPay: false })], NOW)).toEqual([]); // tidak bisa bayar dan tidak punya barang
+    expect(bot().plan(listings, [agent({ canPay: false })], NOW)).toEqual([]); // cannot pay and has no holding
 
     const limited = bot();
     limited.record(acct("summarizer"), NOW - 60);
@@ -66,11 +66,11 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-018 barter cepat dan pencari", () => {
   });
 });
 
-describe.skipIf(!BACKEND_AVAILABLE)("AG-018 ajakan pencari: kotak masuk dan penolakan", () => {
+describe.skipIf(!BACKEND_AVAILABLE)("AG-018 seeker referral: inbox and rejection", () => {
   let market: MarketBook | undefined;
   afterEach(async () => market?.stop());
 
-  it("TC-AG-018-03 agent tanpa opt-in menolak dengan tanda tangan dan pencari tidak bisa mengajak lagi pasangan itu", async () => {
+  it("TC-AG-018-03 an agent without opt-in rejects with a signature and the seeker cannot refer that pair again", async () => {
     market = await startMarketBook(["translator", "summarizer", "cleaner"], { now: NOW * 1000 });
     const m = market;
     const { DEFAULT_BARTER_POLICY, PolicyAgent } = await import("../shared/barter-policy.ts");

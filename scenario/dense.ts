@@ -26,7 +26,7 @@ export function denseEdges(): Payment[] {
 /** `count` pembayaran: setiap edge sekali lebih dulu, sisanya diacak dari edge yang sama menurut seed. */
 export function planDensePayments(count: number, seed: number): Payment[] {
   const edges = denseEdges();
-  if (count < edges.length) throw new Error(`count harus minimal ${edges.length} agar semua edge terpakai`);
+  if (count < edges.length) throw new Error(`count must be at least ${edges.length} so that every edge is used`);
   const random = prng(seed);
   const extra = Array.from({ length: count - edges.length }, () => edges[Math.floor(random() * edges.length)]!);
   return [...edges, ...extra];

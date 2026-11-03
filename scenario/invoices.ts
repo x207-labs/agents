@@ -45,7 +45,7 @@ export function buildInvoiceVouchers(args: {
     const next = { seq: previous.seq + 1, cumulative: previous.cumulative + BigInt(invoice.amount) };
     progress.set(key, next);
     const secretKey = args.secretKeys[invoice.debtor];
-    if (!secretKey) throw new Error(`tidak ada kunci voucher untuk debitur ${invoice.debtor}`);
+    if (!secretKey) throw new Error(`no voucher key for debtor ${invoice.debtor}`);
     const { signature, ...voucher } = signVoucher(
       {
         circle: args.circle, payer: invoice.debtor, payee: invoice.issuer, epoch: args.epoch, seq: next.seq,

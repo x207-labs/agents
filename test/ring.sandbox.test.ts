@@ -21,7 +21,7 @@ import { serveWeb } from "./helpers.ts";
 
 const decode = (header: string | null) => JSON.parse(Buffer.from(header!, "base64").toString("utf8"));
 
-describe.skipIf(!sandboxAvailable)("AG-005 cincin enam agent di near-sandbox", () => {
+describe.skipIf(!sandboxAvailable)("AG-005 six-agent ring on near-sandbox", () => {
   let fx: CircleFixture;
   const servers: Server[] = [];
   const keysDir = mkdtempSync(join(tmpdir(), "x207-ring-keys-"));
@@ -31,7 +31,7 @@ describe.skipIf(!sandboxAvailable)("AG-005 cincin enam agent di near-sandbox", (
     await fx?.stop();
   });
 
-  it("TC-AG-005-01..09, 11 cincin translator -> summarizer -> ... -> gpu -> translator", async () => {
+  it("TC-AG-005-01..09, 11 ring translator -> summarizer -> ... -> gpu -> translator", async () => {
     fx = await deployCircle();
     const view = createCircleViewFn({ circleContract: fx.circle.accountId, rpcUrls: [fx.sandbox.rpcUrl] });
     const accounts = await Promise.all(AGENT_NAMES.map((name) => fx.member(name)));
@@ -75,7 +75,7 @@ describe.skipIf(!sandboxAvailable)("AG-005 cincin enam agent di near-sandbox", (
     }
 
     // TC-AG-005-01: tanpa header pembayaran -> 402 dengan dua entri
-    const challenge = await fetch(`${urls.summarizer}/api/summarize?input=halo`);
+    const challenge = await fetch(`${urls.summarizer}/api/summarize?input=hello`);
     expect(challenge.status).toBe(402);
     const required = decode(challenge.headers.get("PAYMENT-REQUIRED"));
     expect(required.accepts.map((a: { scheme: string; network: string }) => `${a.scheme}@${a.network}`)).toEqual([
@@ -86,7 +86,7 @@ describe.skipIf(!sandboxAvailable)("AG-005 cincin enam agent di near-sandbox", (
     const ring = AGENT_NAMES.map((name, i) => [name, AGENT_NAMES[(i + 1) % AGENT_NAMES.length]!] as const);
     for (const [buyer, seller] of ring) {
       const paid = createAgentBuyer(identity[buyer], { rpcUrls: [fx.sandbox.rpcUrl] });
-      const response = await paid(`${urls[seller]}/api/${AGENTS[seller].verb}?input=halo`);
+      const response = await paid(`${urls[seller]}/api/${AGENTS[seller].verb}?input=hello`);
       expect(response.status, `${buyer} -> ${seller}`).toBe(200);
       expect(await response.json()).toMatchObject({ agent: seller });
       const header = decode(response.headers.get("PAYMENT-RESPONSE"));
@@ -114,7 +114,7 @@ describe.skipIf(!sandboxAvailable)("AG-005 cincin enam agent di near-sandbox", (
     const outsider = await fx.member("outsider");
     const keys = generateVoucherKeypair();
     const client = new X207PaymentClient({ payer: outsider.accountId, secretKey: keys.secretKey, headroom: async () => "1000000" });
-    const rejected = await wrapFetchWithPayment(fetch, client)(`${urls.gpu}/api/compute?input=halo`);
+    const rejected = await wrapFetchWithPayment(fetch, client)(`${urls.gpu}/api/compute?input=hello`);
     expect(rejected.status).toBe(402);
     const body = decode(rejected.headers.get("PAYMENT-REQUIRED"));
     expect(body.error).toBe("member_not_found");

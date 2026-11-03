@@ -84,7 +84,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-029 delegate: paid per vote on the manda
       const error = await book.claim(hash, TX(n), n === 6 ? owner : delegate).catch((e) => e);
       expect(error, String(n)).toBeInstanceOf(BookError);
       expect(error.status).toBe(n === 6 ? 403 : 400);
-      if (n !== 6) expect(error.message).toContain(reason.replace("kind_not_in_mandate", "jenis proposal di luar mandat").replace("not_a_vote", "hanya VoteApprove").replace("wrong_receiver", "DAO dalam mandat").replace("already_claimed", "sudah diklaim"));
+      if (n !== 6) expect(error.message).toContain(reason.replace("kind_not_in_mandate", "outside the mandate").replace("not_a_vote", "only VoteApprove").replace("wrong_receiver", "DAO in the mandate").replace("already_claimed", "already claimed"));
     }
     expect(await code(book.claim(hash, TX(99), delegate))).toMatch(/claim_invalid/); // the node does not know it
     expect(await code(book.claim(hash, TX(1), owner))).toMatch(/403/); // only the seller claims
@@ -128,7 +128,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-029 delegate: paid per vote on the manda
     const book2 = new OrderBook(market.srv.url, CIRCLE_ID, CONTRACT, () => Math.floor(market.clock.now / 1000));
     const hash2 = await book2.open(doc, owner2, delegate2, mandate);
     const error = await book2.claim(hash2, TX(1), delegate2).catch((e) => e);
-    expect(error.message).toContain("sebelum pesanan dibuat");
+    expect(error.message).toContain("before the order was created");
     // and without a claim RPC at all
     await market.srv.close();
     market.db.close();

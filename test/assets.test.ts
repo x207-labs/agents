@@ -5,8 +5,8 @@ import { BACKEND_AVAILABLE, CONTRACT, startMarketBook, type MarketBook } from ".
 
 const NOW = Math.floor(Date.parse("2026-11-04T10:00:00Z") / 1000);
 
-describe("AG-019 aset beragam", () => {
-  it("pasangan mencakup compute, data, akses, dan aset native; kelas A, B, C, D semua dipakai", () => {
+describe("AG-019 varied assets", () => {
+  it("pairs cover compute, data, access and native assets; classes A, B, C, D are all used", () => {
     const types = ASSET_PAIRS.flatMap((p) => [p.sold.assetType, p.paid.assetType]);
     expect(types.filter((t) => t.startsWith("compute:")).length).toBeGreaterThan(0);
     expect(types.filter((t) => t.startsWith("data:")).length).toBeGreaterThan(0);
@@ -18,11 +18,11 @@ describe("AG-019 aset beragam", () => {
   });
 });
 
-describe.skipIf(!BACKEND_AVAILABLE)("AG-019 skenario aset beragam di buku marketplace", () => {
+describe.skipIf(!BACKEND_AVAILABLE)("AG-019 varied asset scenario on the marketplace book", () => {
   let market: MarketBook | undefined;
   afterEach(async () => market?.stop());
 
-  it("TC-AG-019-01 semua pasangan tercocokkan menjadi bundle yang ditandatangani, kelas X ditolak", async () => {
+  it("TC-AG-019-01 every pair is matched into a signed bundle, class X is rejected", async () => {
     market = await startMarketBook(AGENT_NAMES, { now: NOW * 1000 });
     const m = market;
     const report = await runAssetScenario({ book: m.book, identities: m.identities, contractId: CONTRACT, now: () => NOW });
@@ -42,11 +42,11 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-019 skenario aset beragam di buku market
 
     expect(report.rejected).toHaveLength(1);
     expect(report.rejected[0]).toMatchObject({ assetClass: "X", code: "asset_class_rejected", allowed: ["A", "B", "C", "D"] });
-    expect(report.rejected[0]!.message).toContain("kelas X");
+    expect(report.rejected[0]!.message).toContain("class X");
     expect((await m.book.listings({ status: "all" })).some((l) => l.offer.assetClass === "X")).toBe(false);
   });
 
-  it("TC-AG-019-02 pasangan dengan nilai tidak cocok tidak menjadi bundle", async () => {
+  it("TC-AG-019-02 a pair with mismatched values does not become a bundle", async () => {
     market = await startMarketBook(AGENT_NAMES, { now: NOW * 1000 });
     const m = market;
     // pembeli hanya mau membayar 40% dari nilai listing: di bawah batas bawah penjual

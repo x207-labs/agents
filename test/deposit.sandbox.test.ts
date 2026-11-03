@@ -3,13 +3,13 @@ import { afterAll, describe, expect, it } from "vitest";
 import { deployCircle, type CircleFixture } from "../../sdk/test-support/circle.ts";
 import { sandboxAvailable } from "../../sdk/test-support/sandbox.ts";
 
-describe.skipIf(!sandboxAvailable)("AG-007 deposit lewat function-call key", () => {
+describe.skipIf(!sandboxAvailable)("AG-007 deposit through a function-call key", () => {
   let fx: CircleFixture;
   afterAll(async () => {
     await fx?.stop();
   });
 
-  it("TC-AG-007-01 ft_transfer_call dengan deposit 1 yocto ditolak, tanpa deposit diterima", async () => {
+  it("TC-AG-007-01 ft_transfer_call with a 1 yocto deposit is rejected, without a deposit is accepted", async () => {
     fx = await deployCircle();
     const agent = await fx.member("translator");
     const restricted = await agent.withFunctionCallKey(fx.usdt.accountId);

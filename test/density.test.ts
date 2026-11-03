@@ -3,23 +3,23 @@ import { hasCycleThroughAll } from "../scenario/dense.ts";
 import { AGENT_NAMES } from "../shared/registry.ts";
 import { DENSITIES, edgesFor, planDensity, summarize } from "../scenario/density.ts";
 
-describe("AG-010 variasi kepadatan", () => {
-  it("jumlah edge naik: 6, 12, 30, bintang 5", () => {
+describe("AG-010 density variation", () => {
+  it("edge count rises: 6, 12, 30, star 5", () => {
     expect(DENSITIES.map((d) => edgesFor(d).length)).toEqual([6, 12, 30, 5]);
   });
 
-  it("graf bintang tanpa siklus, tiga tingkat lain memuat siklus melewati keenam agent", () => {
+  it("star graph without a cycle, the other three levels hold a cycle through all six agents", () => {
     const as = (d: (typeof DENSITIES)[number]) => edgesFor(d).map((e) => ({ debtor: e.buyer, creditor: e.seller }));
     for (const level of ["low", "medium", "high"] as const) expect(hasCycleThroughAll(AGENT_NAMES, as(level)), level).toBe(true);
     expect(hasCycleThroughAll(AGENT_NAMES, as("star"))).toBe(false);
   });
 
-  it("rencana deterministik menurut seed", () => {
+  it("the plan is deterministic by seed", () => {
     expect(planDensity("high", 60, 3)).toEqual(planDensity("high", 60, 3));
     expect(planDensity("high", 60, 3)).toHaveLength(60);
   });
 
-  it("summarize: rasio 4 desimal dan kepadatan", () => {
+  it("summarize: ratio to 4 decimals and density", () => {
     const edges = [
       { debtor: "a", creditor: "b", amount: "10" },
       { debtor: "b", creditor: "c", amount: "8" },

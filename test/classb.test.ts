@@ -1,12 +1,12 @@
-// AG-015: bagian murni skenario kelas B (tanpa jaringan): kunci akses, scope, urutan transaksi, dan penilaian hasil probe. Alur lengkap di near-sandbox
+// AG-015: bagian murni class B scenario (tanpa jaringan): kunci akses, scope, urutan transaksi, dan penilaian hasil probe. Alur lengkap di near-sandbox
 // ada di demo/classb.demo.ts (npm run demo:classb).
 import { describe, expect, it } from "vitest";
 import { base58Decode, parseFunctionCallKeyScope, voucherPublicKey, type ContractCall } from "@x207/core";
 import { acceptRental, offerRental } from "../onboarding/rental.ts";
 import { CLASS_B_ASSET_TYPE, assertProbe, newAccessKey, payLease, probeKey, rentalScope, type CallWithKey, type KeyProbe } from "../scenario/classb.ts";
 
-describe("AG-015 skenario kelas B", () => {
-  it("newAccessKey: format NEAR 64 byte (seed + publik), publik cocok dengan seed, deterministik untuk seed yang sama", () => {
+describe("AG-015 class B scenario", () => {
+  it("newAccessKey: NEAR format 64 bytes (seed + public), public matches the seed, deterministic for the same seed", () => {
     const seed = new Uint8Array(32).fill(7);
     const key = newAccessKey(seed);
     const secret = base58Decode(key.secretKey.slice("ed25519:".length));
@@ -17,13 +17,13 @@ describe("AG-015 skenario kelas B", () => {
     expect(newAccessKey().publicKey).not.toBe(newAccessKey().publicKey);
   });
 
-  it("rentalScope lolos parser scope kelas B dari @x207/core", () => {
+  it("rentalScope passes the class B scope parser of @x207/core", () => {
     expect(parseFunctionCallKeyScope(rentalScope("circle.near", ["get_params"]))).toEqual({
       receiver_id: "circle.near", method_names: ["get_params"], allowance: "1000000000000000000000000",
     });
   });
 
-  it("offerRental dan acceptRental mengirim argumen persis: unit day, operator broker, delivery_pubkey milik penyewa", async () => {
+  it("offerRental and acceptRental send exact arguments: unit day, operator broker, delivery_pubkey of the renter", async () => {
     const sent: ContractCall[] = [];
     const send = async (call: ContractCall) => {
       sent.push(call);
@@ -41,7 +41,7 @@ describe("AG-015 skenario kelas B", () => {
     expect(JSON.stringify(sent, (_k, v) => (typeof v === "bigint" ? v.toString() : v))).not.toContain(key.secretKey);
   });
 
-  it("payLease memanggil /grants/{id}/lease lewat fetch pembeli dan membaca status, badan dan PAYMENT-RESPONSE", async () => {
+  it("payLease calls /grants/{id}/lease through the buyer fetch and reads the status, body and PAYMENT-RESPONSE", async () => {
     const urls: string[] = [];
     const buy = (async (url: string) => {
       urls.push(url);
@@ -51,19 +51,19 @@ describe("AG-015 skenario kelas B", () => {
     expect(urls).toEqual(["http://broker/grants/3/lease"]);
   });
 
-  it("probeKey dan assertProbe: sah jalan, method lain dan deposit ditolak; hasil lain gagal", async () => {
+  it("probeKey and assertProbe: the valid call works, another method and a deposit are rejected; any other result fails", async () => {
     const calls: Array<[string, bigint]> = [];
     const call: CallWithKey = async (_key, method, deposit) => {
       calls.push([method, deposit]);
-      return method === "get_params" && deposit === 0n ? { ok: true, hash: "h" } : { ok: false, error: "tolak" };
+      return method === "get_params" && deposit === 0n ? { ok: true, hash: "h" } : { ok: false, error: "rejected" };
     };
     const probe = await probeKey(call, newAccessKey(), "get_params", "get_epoch");
     expect(calls).toEqual([["get_params", 0n], ["get_epoch", 0n], ["get_params", 1n]]);
     expect(() => assertProbe(probe)).not.toThrow();
     const ok = { ok: true, hash: "h" } as const;
     const no = { ok: false, error: "x" } as const;
-    expect(() => assertProbe({ allowed: no, otherMethod: no, withFunds: no } satisfies KeyProbe)).toThrow(/diizinkan gagal/);
-    expect(() => assertProbe({ allowed: ok, otherMethod: ok, withFunds: no })).toThrow(/method di luar/);
-    expect(() => assertProbe({ allowed: ok, otherMethod: no, withFunds: ok })).toThrow(/dana terlampir/);
+    expect(() => assertProbe({ allowed: no, otherMethod: no, withFunds: no } satisfies KeyProbe)).toThrow(/allowed call failed/);
+    expect(() => assertProbe({ allowed: ok, otherMethod: ok, withFunds: no })).toThrow(/method outside/);
+    expect(() => assertProbe({ allowed: ok, otherMethod: no, withFunds: ok })).toThrow(/attached funds/);
   });
 });
