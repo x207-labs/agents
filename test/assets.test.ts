@@ -31,7 +31,9 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-019 skenario aset beragam di buku market
     for (const pair of report.pairs) {
       expect(pair.steps[0]).toBe("listed");
       expect(pair.steps).toContain("accepted");
-      expect(pair.bundle).toMatchObject({ status: "ready", participants: 2 });
+      // BE-047: a match with an off-chain asset (class B or C) stays `proposed` until the receiver confirms the delivery or the window ends in silence
+      const offChain = [pair.soldClass, pair.paidClass].some((c) => c === "B" || c === "C");
+      expect(pair.bundle).toMatchObject({ status: offChain ? "proposed" : "ready", participants: 2 });
     }
     expect(report.classes).toEqual(["A", "B", "C", "D"]);
     expect((await m.book.listings({ status: "matched" })).map((l) => `${l.offer.assetType}/${l.offer.assetClass}`).sort()).toEqual([

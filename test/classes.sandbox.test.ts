@@ -8,7 +8,7 @@ import { createCircleViewFn, onboardMember, type ContractCall } from "@x207/core
 import { CATALOG, registerCatalog } from "../../scripts/lib/asset-catalog.mjs";
 import { SHORT_PARAMS, TERMS_HASH, deployCircle, type CircleFixture } from "../../sdk/test-support/circle.ts";
 import { MOCK_RWA_WASM, sandboxAvailable, type SandboxAccount } from "../../sdk/test-support/sandbox.ts";
-import { runClassScenario, type ClassScenarioPorts } from "../scenario/classes.ts";
+import { runClassScenario, type ClassScenarioPorts } from "./classes-scenario.ts";
 
 describe.skipIf(!sandboxAvailable || !existsSync(MOCK_RWA_WASM))("AG-022 one asset of each class in near-sandbox", () => {
   let fx: CircleFixture;
@@ -21,7 +21,7 @@ describe.skipIf(!sandboxAvailable || !existsSync(MOCK_RWA_WASM))("AG-022 one ass
     fx = await deployCircle({ ...SHORT_PARAMS, epoch_length: 86_400 });
     const dao = await fx.sandbox.createAccount("dao", "10");
     const view = createCircleViewFn({ circleContract: fx.circle.accountId, rpcUrls: [fx.sandbox.rpcUrl] });
-    const chain = (method: string, args: object) => fx.sandbox.view(fx.circle.accountId, method, args);
+    const chain = (method: string, args: Record<string, unknown>) => fx.sandbox.view(fx.circle.accountId, method, args);
 
     // the registry: the whole catalog, through the same function as the script
     const registered = await registerCatalog({

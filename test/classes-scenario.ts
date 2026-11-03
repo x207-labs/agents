@@ -1,4 +1,6 @@
-// Skenario satu aset tiap kelas di kontrak (AG-022, F8): registri D10 sudah berisi katalog, lalu kelas A (token RWA tiruan dengan whitelist), B (kunci akses NEAR),
+// Skenario satu aset tiap kelas di kontrak (AG-022, F8). Berkas ini ada di `test/` karena yang dikirimnya adalah tindakan pemilik (titipan token, penerimaan grant),
+// di luar kebijakan agent AG-007 yang melarang folder `scenario/` mengirim transaksi berdeposit.
+// Isi: registri D10 sudah berisi katalog, lalu kelas A (token RWA tiruan dengan whitelist), B (kunci akses NEAR),
 // C (kunci API lewat proxy), dan D (jam GPU) masing-masing dibuat sebagai grant, dan satu aset kelas X ditolak. Hanya kontrak yang dipakai; broker, facilitator, dan
 // penyedia tiruan tidak ikut, jadi untuk B sampai D yang dibuktikan adalah penawaran dan penerimaan di D11, bukan pengiriman aksesnya (itu ada di test broker).
 // `assertBuyerRegisteredAtToken` (SD-060) tidak dipanggil di sini karena `probes/mock_rwa` belum punya view `storage_balance_of`; di token nyata helper itu dipakai sebelum membeli.

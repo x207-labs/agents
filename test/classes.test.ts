@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContractCall } from "@x207/core";
-import { RWA_AMOUNT, RWA_PRICE, runClassScenario, type ClassScenarioActors, type ClassScenarioPorts } from "../scenario/classes.ts";
+import { RWA_AMOUNT, RWA_PRICE, runClassScenario, type ClassScenarioActors, type ClassScenarioPorts } from "./classes-scenario.ts";
 
 const A = "alice.near";
 const B = "bob.near";
