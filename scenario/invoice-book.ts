@@ -26,6 +26,12 @@ export class BookError extends Error {
   }
 }
 
+/** Tanda tangan notice JSON apa pun: NEP-413 atas `sha256(json)` dengan penerima akun kontrak (skema yang sama untuk semua notice buku). */
+export function signJsonNotice(contract: string, notice: object, secretKey: VoucherSecretKey): string {
+  const json = JSON.stringify(notice);
+  return signHash(nep413SigningHash(json, createHash("sha256").update(json).digest(), contract), secretKey);
+}
+
 /** Notice invoice: JSON kanonik `circle, invoice_hash, actor, action, at, reason`, ditandatangani seperti notice penyerahan (NEP-413 atas `sha256(json)`). */
 export function signedNotice(contract: string, doc: InvoiceDocument, actor: InvoiceActor, action: "requested" | "rejected", at: number, reason: string | null = null) {
   const notice = { circle: contract, invoice_hash: invoiceHash(doc), actor: actor.account, action, at, reason };
