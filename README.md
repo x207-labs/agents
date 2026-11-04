@@ -4,7 +4,7 @@ Six demo agents that buy and sell services over x402, settled as mutual credit b
 
 ## Its role in x207
 
-The agents show what the layer is for. Each one sells a small service (translate, summarize, scrape, image, clean, compute) behind an x402 paywall and buys from the others, paying with signed vouchers instead of one transfer per call. They use only public packages: `@x402/fetch`, `@x207/scheme` and `@x207/core` from the [SDK](https://github.com/x207-labs/sdk). The `scenario/` folder holds the scenarios that the demos and end-to-end tests of the umbrella (`demo/`) import, run against the [contract](https://github.com/x207-labs/contracts).
+The agents show what the layer is for. Each one sells a small service (translate, summarize, scrape, image, clean, compute) behind an x402 paywall and buys from the others, paying with signed vouchers instead of one transfer per call. Their source uses only public packages (the tests reach further, see Test): `@x402/fetch`, `@x207/scheme` and `@x207/core` from the [SDK](https://github.com/x207-labs/sdk). The `scenario/` folder holds the scenarios that the demos and end-to-end tests of the umbrella (`demo/`) import, run against the [contract](https://github.com/x207-labs/contracts).
 
 ```mermaid
 sequenceDiagram
@@ -34,11 +34,11 @@ sequenceDiagram
 | cleaner | `agents/cleaner` | 4205 | `GET /api/clean?input=...` |
 | gpu | `agents/gpu` | 4206 | `GET /api/compute?input=...` |
 
-Override a port with `<NAME>_PORT`, for example `TRANSLATOR_PORT=5001`.
+Override a port with `<NAME>_PORT` (the agent name in capitals), for example `TRANSLATOR_PORT=5001` or `GPU_PORT=5006`.
 
 ## Try it
 
-Without credits or a network, in mock mode:
+Needs Node 22.22.2 or newer. Without credits or a network, in mock mode (the agent has no paywall until `FACILITATOR_URL` is set, so the call below is free):
 
 ```bash
 npm install
@@ -46,7 +46,7 @@ NEARAI_MODE=mock npm run agent -- agents/summarizer/index.ts
 curl "localhost:4202/api/summarize?input=hello"
 ```
 
-Mock mode answers `[mock:<agent>] <input>`. The full story, six agents trading for four epochs on a local circle, is `npm run demo:swarm` in the [umbrella](https://github.com/x207-labs/x207#run-it-locally-5-minutes).
+Mock mode answers `{"agent":"summarizer","result":"[mock:summarizer] hello"}`. The full story, six agents trading for four epochs on a local circle, is `npm run demo:swarm` in the [umbrella](https://github.com/x207-labs/x207#run-it-locally-5-minutes).
 
 ## Test
 
@@ -56,7 +56,9 @@ npm run typecheck
 npm run test:sandbox    # X207_SANDBOX=1, needs near-sandbox (run from the umbrella)
 ```
 
-Node 26 runs the `.ts` files directly (type stripping), so there is no build step. Copy `.env.example` to `.env` and fill it by hand; `.env` is git-ignored.
+`npm install` works on this repository alone, and so does the agent above. The end-to-end tests do not: `test/*.sandbox.test.ts` and `test/stack.ts` import the test support of the SDK, the facilitator and the umbrella scripts. On its own, `npm test` runs the other test files and reports those eight as failed, and `npm run typecheck` reports their imports. Run the tests from a recursive checkout of the [umbrella](https://github.com/x207-labs/x207) (`npm ci`, then `npm test -w @x207/agents`); the agents' source itself uses only the public packages (`npm run check:imports`).
+
+Node 22.22.2 or newer runs the `.ts` files directly (type stripping is on by default since Node 22.18), so there is no build step. Copy `.env.example` to `.env` and fill it by hand; `.env` is git-ignored.
 
 ## Inference on NEAR AI Cloud
 
