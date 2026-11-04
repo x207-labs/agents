@@ -1,15 +1,15 @@
-// Binding x207 untuk agent (AG-005): penjual lewat x207Middleware, pembeli lewat @x402/fetch dengan klien x207.
-// Hanya paket publik @x402/fetch, @x207/scheme, dan @x207/core yang dipakai di sini (AG-006).
+// x207 binding for agents (AG-005): the seller through x207Middleware, the buyer through @x402/fetch with the x207 client.
+// Only the public packages @x402/fetch, @x207/scheme, and @x207/core are used here (AG-006).
 import { wrapFetchWithPayment } from "@x402/fetch";
 import { X207ExtraSource, X207PaymentClient, headroomFromRpc, x207Middleware } from "@x207/scheme";
 import type { Paywall, SellerConfig } from "./agent-server.ts";
 import type { AgentIdentity } from "./identity.ts";
 import type { AgentSpec } from "./registry.ts";
 
-/** Harga default per panggilan: 0,02 credit (FX-04). */
+/** Default price per call: 0.02 credit (FX-04). */
 export const DEFAULT_PRICE = "$0.02";
 
-/** Endpoint berbayar `/api/<verb>` dengan `accepts` x207 dan `exact`; header PAYMENT-RESPONSE diteruskan oleh middleware. */
+/** Paid endpoint `/api/<verb>` with x207 `accepts` and `exact`; the PAYMENT-RESPONSE header is passed through by the middleware. */
 export function createSellerPaywall(spec: AgentSpec, config: SellerConfig): Paywall {
   return x207Middleware({
     routes: { [`/api/${spec.verb}`]: { price: config.price ?? DEFAULT_PRICE, description: `${spec.name} agent` } },
@@ -23,16 +23,16 @@ export function createSellerPaywall(spec: AgentSpec, config: SellerConfig): Payw
 export type BuyerOptions = {
   rpcUrls?: readonly string[];
   fetch?: typeof fetch;
-  /** Leg bundle F5 (SD-048): `bundle_id` untuk pembayaran ke `payee` di `epoch`, atau `undefined` bila bukan leg. */
+  /** F5 bundle leg (SD-048): `bundle_id` for payment to `payee` in `epoch`, or `undefined` if not a leg. */
   bundleFor?: (payee: string, epoch: number) => number | undefined;
 };
 
-/** `fetch` yang membayar 402 dengan voucher bertanda tangan kunci voucher agent; tidak pernah mengirim transaksi. */
+/** `fetch` that pays the 402 with a voucher signed by the agent voucher key; never sends a transaction. */
 export function createAgentBuyer(identity: AgentIdentity, options: BuyerOptions = {}): typeof fetch {
   const client = new X207PaymentClient({
     payer: identity.accountId,
     secretKey: identity.voucherSecretKey,
-    // AG-008: kebijakan belanja pemilik jadi pagar klien; voucher di atas batas tidak pernah ditandatangani
+    // AG-008: the owner spend policy becomes the client guard; a voucher above the limit is never signed
     spendLimit: { maxPerCall: identity.policy.maxPerCall, maxPerEpoch: identity.policy.maxPerEpoch },
     ...(options.bundleFor ? { bundleFor: options.bundleFor } : {}),
     headroom: headroomFromRpc({

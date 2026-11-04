@@ -5,7 +5,7 @@ import { createNearAiClient, NearAiConfigError, NearAiError, type LlmClient } fr
 import type { AgentSpec } from "./registry.ts";
 import { createSellerPaywall } from "./x207.ts";
 
-/** Penjaga pembayaran x207 (x207Middleware dari @x207/scheme): Request web standar masuk, Response keluar. */
+/** x207 payment guard (x207Middleware from @x207/scheme): a standard web Request comes in, a Response goes out. */
 export type Paywall = (request: Request, next: (request: Request) => Response | Promise<Response>) => Promise<Response>;
 
 const json = (status: number, body: unknown): Response =>
@@ -40,7 +40,7 @@ export function createAgentServer(spec: AgentSpec, llm: LlmClient, paywall?: Pay
     const { pathname } = new URL(request.url);
     if (request.method === "GET" && pathname === "/health") return json(200, { ok: true, agent: spec.name });
     if (request.method === "GET" && pathname === `/api/${spec.verb}`) {
-      // Hanya endpoint berbayar yang lewat penjaga; /health tetap gratis.
+      // Only paid endpoints go through the guard; /health stays free.
       return paywall ? paywall(request, api) : api(request);
     }
     return json(404, { error: "not_found" });
@@ -58,10 +58,10 @@ export function createAgentServer(spec: AgentSpec, llm: LlmClient, paywall?: Pay
 export type SellerConfig = {
   facilitatorUrl: string;
   circleId: string;
-  /** Akun NEAR agent penjual yang menerima pembayaran. */
+  /** NEAR account of the selling agent that receives payment. */
   payTo: AccountId;
   price?: string;
-  /** Jam untuk cache `extra` (test). */
+  /** Clock for the `extra` cache (tests). */
   now?: () => number;
 };
 
@@ -84,7 +84,7 @@ export function startAgent(spec: AgentSpec): Server {
     console.error(`[${spec.name}] config error: CIRCLE_CONTRACT is required when FACILITATOR_URL is set`);
     process.exit(1);
   }
-  // Tanpa FACILITATOR_URL agent melayani gratis (mode pengembangan AG-003).
+  // Without FACILITATOR_URL the agent serves for free (development mode AG-003).
   const paywall = facilitatorUrl
     ? createSellerPaywall(spec, {
         facilitatorUrl,

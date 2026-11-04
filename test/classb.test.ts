@@ -1,5 +1,5 @@
-// AG-015: bagian murni class B scenario (tanpa jaringan): kunci akses, scope, urutan transaksi, dan penilaian hasil probe. Alur lengkap di near-sandbox
-// ada di demo/classb.demo.ts (npm run demo:classb).
+// AG-015: the pure part of the class B scenario (no network): access key, scope, transaction order, and probe result judgement. The full flow on near-sandbox
+// is in demo/classb.demo.ts (npm run demo:classb).
 import { describe, expect, it } from "vitest";
 import { base58Decode, parseFunctionCallKeyScope, voucherPublicKey, type ContractCall } from "@x207/core";
 import { acceptRental, offerRental } from "../onboarding/rental.ts";

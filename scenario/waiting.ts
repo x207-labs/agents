@@ -1,11 +1,11 @@
-// Skenario listing menunggu (AG-017, F9): Andi menjual A dan mencari B saat belum ada lawan. Listing tetap terbuka lintas waktu,
-// lawan datang kemudian, keduanya bernegosiasi menurut kebijakan masing-masing, dan hasilnya bundle yang ditandatangani kedua pihak.
-// Satu listing lain tidak pernah mendapat lawan dan hilang dari hasil setelah kedaluwarsa. Waktu digerakkan lewat `advance`.
+// Waiting listing scenario (AG-017, F9): Andi sells A and seeks B while there is no counterparty yet. The listing stays open across time,
+// the counterparty arrives later, both negotiate according to their own policies, and the result is a bundle signed by both parties.
+// Another listing never gets a counterparty and disappears from the results after it expires. Time is moved with `advance`.
 import { DEFAULT_BARTER_POLICY, PolicyAgent, type BarterPolicy, type StepResult } from "../shared/barter-policy.ts";
 import type { BookClient } from "../shared/barter.ts";
 import type { AgentIdentity } from "../shared/identity.ts";
 
-/** Harga satuan default 10 credit per unit (listing bernilai 100 credit); test sandbox memakai harga kecil agar leg bisa dibayar dengan panggilan 0,02. */
+/** Default unit price 10 credit per unit (listing worth 100 credit); the sandbox test uses a small price so the leg can be paid with a 0.02 call. */
 export const DEFAULT_UNIT_MICRO = 10_000_000;
 
 export function waitingPolicies(unitMicro: number = DEFAULT_UNIT_MICRO) {
@@ -19,7 +19,7 @@ export function waitingPolicies(unitMicro: number = DEFAULT_UNIT_MICRO) {
     late: {
       ...DEFAULT_BARTER_POLICY,
       holdings: [{ assetType: "service:summarize-calls", assetClass: "D", quantity: 10, unitValue: String(unitMicro) }],
-      // pembeli terlambat hanya mau membayar sampai 92% per unit: perlu dua putaran tawar
+      // the late buyer only agrees to pay up to 92% per unit: needs two bargaining rounds
       needs: [{ assetType: "service:translate-calls", assetClass: "D", quantity: 10, maxUnitValue: String(Math.round(unitMicro * 0.92)) }],
     },
   } satisfies Record<string, BarterPolicy>;
@@ -31,9 +31,9 @@ export type WaitingEvent = { at: number; what: string };
 
 export type WaitingReport = {
   timeline: WaitingEvent[];
-  /** Detik listing Andi menunggu sebelum ada tawaran pertama. */
+  /** Seconds Andi's listing waits before the first offer. */
   waitedSeconds: number;
-  /** Listing tanpa lawan yang kedaluwarsa dan hilang dari hasil `open`. */
+  /** Listing with no counterparty that expires and disappears from the `open` results. */
   expiredHash: string;
   rounds: Array<{ kind: StepResult["kind"]; value?: string }>;
   bundle: { termsHash: string; status: string; participants: number } | null;
@@ -45,9 +45,9 @@ export async function runWaitingScenario(args: {
   late: AgentIdentity;
   contractId: string;
   clock: { now: number };
-  /** Geser jam semua pihak (agent dan server) sebesar `seconds`. */
+  /** Shift the clock of all parties (agents and server) by `seconds`. */
   advance: (seconds: number) => void;
-  /** Harga satuan dalam satuan terkecil credit; default 10 credit. */
+  /** Unit price in credit smallest units; default 10 credit. */
   unitMicro?: number;
 }): Promise<WaitingReport> {
   const { book, clock } = args;
@@ -62,19 +62,19 @@ export async function runWaitingScenario(args: {
   const listedAt = clock.now;
   const { hash } = await andi.list();
   note("andi lists translate-calls, wants summarize-calls; no counterparty exists yet");
-  // Listing kedua dengan umur pendek yang tidak akan mendapat lawan
+  // A second listing with a short lifetime that will not get a counterparty
   const short = new PolicyAgent({ identity: args.seller, book, contractId: args.contractId, policy: { ...policies.seller, listingTtlSeconds: 1800 }, now });
   const { hash: expiredHash } = await short.list();
   note("andi also lists a short-lived offer that nobody will take");
 
-  // Waktu berjalan tanpa lawan: listing tetap ada dan terbaca
+  // Time passes with no counterparty: the listing stays and can be read
   for (const hours of [1, 2]) {
     args.advance(3600);
     const open = (await book.listings({ status: "open" })).map((l) => l.listingHash);
     note(`${hours}h later: listing still open (${open.includes(hash) ? "yes" : "no"}), short offer ${open.includes(expiredHash) ? "still open" : "expired and gone from open results"}`);
   }
 
-  // Lawan datang kemudian
+  // The counterparty arrives later
   const arrival = clock.now;
   const bids = await budi.shop();
   note(`budi arrives, finds the listing and bids ${bids[0]?.kind === "bid" ? bids[0].value : "nothing"}`);

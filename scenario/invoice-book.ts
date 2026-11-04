@@ -1,6 +1,6 @@
-// Agen yang memakai buku invoice backend (AG-025, pipeline P8, ADR-44) dengan format SDK (SD-065): `x207:invoice:<hash>`, notice bertanda tangan, voucher cicilan seq 1 pasangan
-// di epochnya, dan voucher susulan yang ditandatangani setelah gagal. Kode ini hanya memakai paket publik (`@x207/core`) dan HTTP; yang dilakukan kontrak (mendaftarkan voucher)
-// bukan urusan agen ini: penagih atau siapa pun mendaftarkan voucher, buku hanya membaca hasilnya.
+// Agent that uses the backend invoice book (AG-025, pipeline P8, ADR-44) in the SDK format (SD-065): `x207:invoice:<hash>`, signed notice, installment voucher seq 1 of the pair
+// in its epoch, and a follow-up voucher signed after a failure. This code only uses the public package (`@x207/core`) and HTTP; what the contract does (registering the voucher)
+// is not this agent's concern: the biller or anyone registers the voucher, the book only reads the result.
 import { createHash } from "node:crypto";
 import {
   catchUpVoucher, installmentVoucher, invoiceHash, nep413SigningHash, planInstallments, signHash, signVoucher,
@@ -28,13 +28,13 @@ export class BookError extends Error {
   }
 }
 
-/** Tanda tangan notice JSON apa pun: NEP-413 atas `sha256(json)` dengan penerima akun kontrak (skema yang sama untuk semua notice buku). */
+/** Signature of any JSON notice: NEP-413 over `sha256(json)` with the contract account as recipient (the same scheme for all book notices). */
 export function signJsonNotice(contract: string, notice: object, secretKey: VoucherSecretKey): string {
   const json = JSON.stringify(notice);
   return signHash(nep413SigningHash(json, createHash("sha256").update(json).digest(), contract), secretKey);
 }
 
-/** Notice invoice: JSON kanonik `circle, invoice_hash, actor, action, at, reason`, ditandatangani seperti notice penyerahan (NEP-413 atas `sha256(json)`). */
+/** Invoice notice: canonical JSON `circle, invoice_hash, actor, action, at, reason`, signed like the handover notice (NEP-413 over `sha256(json)`). */
 export function signedNotice(contract: string, doc: InvoiceDocument, actor: InvoiceActor, action: "requested" | "rejected", at: number, reason: string | null = null) {
   const notice = { circle: contract, invoice_hash: invoiceHash(doc), actor: actor.account, action, at, reason };
   const json = JSON.stringify(notice);
@@ -64,7 +64,7 @@ export class InvoiceBook {
     return json;
   }
 
-  /** Penagih mengajukan invoice dengan `installments` cicilan. */
+  /** The biller submits an invoice with `installments` installments. */
   async request(doc: InvoiceDocument, installments: number, issuer: InvoiceActor): Promise<InvoiceState> {
     return this.call("POST", "/invoices", { document: doc, installments, ...signedNotice(this.contract, doc, issuer, "requested", this.now()) });
   }
@@ -75,7 +75,7 @@ export class InvoiceBook {
     return this.call("GET", `/invoices?party=${encodeURIComponent(party)}${status ? `&status=${status}` : ""}`);
   }
 
-  /** Debtor menyetujui: memeriksa hash dan jadwal terhadap rencana SDK, lalu menandatangani semua voucher cicilan sekaligus (seq 1 di epochnya). */
+  /** The debtor approves: checks the hash and schedule against the SDK plan, then signs all installment vouchers at once (seq 1 in its epoch). */
   async approve(hash: string, debtor: InvoiceActor): Promise<InvoiceState> {
     const view = await this.get(hash);
     if (invoiceHash(view.document) !== view.invoiceHash) throw new Error("invoice hash does not match its document: not signed");
@@ -90,11 +90,11 @@ export class InvoiceBook {
     });
     return this.call("POST", `/invoices/${hash}/approve`, { vouchers });
   }
-  /** Debtor menolak dengan alasan. */
+  /** The debtor rejects with a reason. */
   async reject(doc: InvoiceDocument, debtor: InvoiceActor, reason: string): Promise<InvoiceState> {
     return this.call("POST", `/invoices/${invoiceHash(doc)}/reject`, signedNotice(this.contract, doc, debtor, "rejected", this.now(), reason));
   }
-  /** Voucher susulan: ditandatangani HANYA setelah cicilan gagal, di atas keadaan pasangan di epoch tujuan. Digeser sekali. */
+  /** Follow-up voucher: signed ONLY after an installment fails, on top of the pair state in the target epoch. Shifted once. */
   async catchUp(hash: string, index: number, debtor: InvoiceActor, stateInNextEpoch: InvoicePairState): Promise<InvoiceState> {
     const view = await this.get(hash);
     const item = view.installments.find((i) => i.index === index);

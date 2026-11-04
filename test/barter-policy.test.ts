@@ -7,7 +7,7 @@ import { acct, BACKEND_AVAILABLE, CONTRACT, startMarketBook, type MarketBook } f
 const C = (n: number) => String(n * 1_000_000);
 const NOW = Math.floor(Date.parse("2026-11-04T10:00:00Z") / 1000);
 
-// Angka kebijakan contoh: nilai listing 100, lantai terima 90, tolak di bawah 50, pembuka 85, langkah 5.
+// Example policy numbers: listing value 100, accept floor 90, reject below 50, opening 85, step 5.
 const sellerPolicy: BarterPolicy = {
   ...DEFAULT_BARTER_POLICY,
   holdings: [{ assetType: "translate-calls", assetClass: "D", quantity: 10, unitValue: C(10) }],
@@ -142,7 +142,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-016 two-agent negotiation through the bo
     expect(await budi.signProposals()).toEqual([{ termsHash: expect.any(String), action: "signed" }]);
     const [proposal] = await m.book.proposals(acct("summarizer"), "ready");
     expect(proposal).toMatchObject({ status: "ready", missing: [], listingHash: hash });
-    // nilai kesepakatan 90 (bukan 100 di listing): Budi membayar 90 ke Andi; Andi membayar 100 + cashback 9 (diskon 10% dari 90)
+    // deal value 90 (not the listing's 100): Budi pays 90 to Andi; Andi pays 100 + cashback 9 (10% discount of 90)
     const leg = (payer: string, payee: string) => proposal!.terms.legs.find((l) => l.payer === acct(payer) && l.payee === acct(payee))?.max_amount;
     expect(leg("summarizer", "translator")).toBe(C(90));
     expect(leg("translator", "summarizer")).toBe(C(109));
@@ -168,7 +168,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-016 two-agent negotiation through the bo
     await budi.shop();
     await andi.handleInbox();
     expect((await budi.handleInbox())[0]).toMatchObject({ kind: "accepted" });
-    // syarat diganti diam-diam di buku (stand-in pihak jahat): leg pertama dinaikkan
+    // terms silently changed in the book (malicious stand-in): the first leg is raised
     const row = m.db.prepare("SELECT id, terms_json, terms_hash FROM bundle_proposals").get() as { id: number; terms_json: string };
     const terms = JSON.parse(row.terms_json);
     terms.legs[0].max_amount = String(BigInt(terms.legs[0].max_amount) + 1n);

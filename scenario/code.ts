@@ -1,10 +1,10 @@
-// Agen yang menjual dan membeli kode sekali tukar (AG-030, pipeline P3, ADR-48) dengan format SDK (SD-076): kode dan salt dienkripsi, listing hanya memuat `code_commitment`,
-// kunci disegel ke pembeli, voucher pembeli ditahan buku, dan penerbit dicek sebelum kunci dilepas. Buku kode di sini TIRUAN (`MockCodeBook`) dan penerbitnya tiruan
-// (`MockCodeIssuer`); keduanya memakai antarmuka `CodeBookApi` yang akan dipenuhi buku asli BE-069 lewat HTTP, jadi fungsi penjual dan pembeli di bawah tidak berubah saat buku
-// asli ada: cukup beri `HttpCodeBook` yang memetakan lima method ke rute backend. Nama error tiruan mengikuti `backend/docs/code-book.md` (usulan, belum final).
+// Agent that sells and buys one-time-exchange codes (AG-030, pipeline P3, ADR-48) in the SDK format (SD-076): the code and salt are encrypted, the listing only carries `code_commitment`,
+// the key is sealed to the buyer, the buyer's voucher is held by the book, and the issuer is checked before the key is released. The code book here is a MOCK (`MockCodeBook`) and the issuer is a mock
+// (`MockCodeIssuer`); both use the `CodeBookApi` interface that the real BE-069 book will fulfil over HTTP, so the seller and buyer functions below do not change once the real book
+// exists: just provide an `HttpCodeBook` that maps the five methods to backend routes. The mock error names follow `backend/docs/code-book.md` (proposal, not final).
 //
-// Bagian kedua: proxy rahasia (`SecretProxy`, BE-070) untuk kunci API yang dijual per panggilan: kunci asli hanya ada di proxy milik pemberi, tagihan satu unit per panggilan yang
-// berhasil, dan hitungan pembeli (`BuyerMeter`, SD-068) harus sama dengan tagihan.
+// Part two: secret proxy (`SecretProxy`, BE-070) for API keys sold per call: the real key only lives in the proxy owned by the grantor, billing one unit per successful
+// call, and the buyer's count (`BuyerMeter`, SD-068) must equal the bill.
 import {
   CODE_DISPUTE_WINDOW_SECONDS, checkCodeDocument, codeCommitment, codeDocumentHash, codeOverLimit, codeResource, contentHash, createCodeRelease, encryptCode, fetchCiphertext, listingHash,
   signListing, signVoucher, verifyCodeDelivery, verifyListingSignature, verifyVoucher, voucherPublicKey,
@@ -16,7 +16,7 @@ import { LicenseBook, type PurchaseState } from "./license.ts";
 
 export type CodeActor = InvoiceActor & { publicKey: string };
 
-/** Penerbit tiruan: menyimpan kode yang diterbitkan; `markUsed` menandai kode terpakai (ditebus di tempat lain). */
+/** Mock issuer: stores the issued codes; `markUsed` marks a code as used (redeemed elsewhere). */
 export class MockCodeIssuer implements CodeIssuer {
   readonly name: string;
   private readonly state = new Map<string, "valid" | "used">();
@@ -30,7 +30,7 @@ export class MockCodeIssuer implements CodeIssuer {
   markUsed(code: string): void {
     if (this.state.has(code)) this.state.set(code, "used");
   }
-  /** Pembeli menebus kode di penerbit: berhasil sekali. */
+  /** The buyer redeems the code at the issuer: succeeds once. */
   redeem(code: string): boolean {
     if (this.state.get(code) !== "valid") return false;
     this.state.set(code, "used");
@@ -42,10 +42,10 @@ export class MockCodeIssuer implements CodeIssuer {
   }
 }
 
-/** Keadaan satu pembelian kode: bentuk yang sama dengan pembelian lisensi (BE-056); kode selalu eksklusif. */
+/** State of one code purchase: the same shape as a license purchase (BE-056); a code is always exclusive. */
 export type CodePurchase = PurchaseState;
 
-/** Yang dipakai penjual dan pembeli dari buku kode; buku asli (BE-069) memetakan ini ke rute HTTP. */
+/** What the seller and buyer use from the code book; the real book (BE-069) maps this to HTTP routes. */
 export interface CodeBookApi {
   readonly contract: string;
   at(): number;
@@ -54,15 +54,15 @@ export interface CodeBookApi {
   get(id: string): Promise<CodePurchase>;
   notice(id: string, notice: any, signature: string): Promise<CodePurchase>;
   /**
-   * Penjual menunjukkan kode sekali agar penerbit dicek (`POST /listings/{hash}/code-check`); buku menyimpan hanya vonis dan waktunya dan menjawab 200 dengan vonis: `used`
-   * membatalkan pembelian dan listing. Melempar `code_issuer_unknown`, `code_issuer_unavailable`, `code_not_verifiable`, atau `code_bad_commitment`.
+   * The seller shows the code once so the issuer is checked (`POST /listings/{hash}/code-check`); the book stores only the verdict and its time and answers 200 with the verdict: `used`
+   * cancels the purchase and the listing. Throws `code_issuer_unknown`, `code_issuer_unavailable`, `code_not_verifiable`, or `code_bad_commitment`.
    */
   check(listingHash: string, seller: CodeActor, code: string, salt: string): Promise<{ verdict: CodeCheck; checkedAt: number }>;
 }
 
 type Held = CodePurchase & { ciphertext?: Uint8Array; voucherHeld?: Voucher; price: string }
 
-/** Buku kode tiruan, di memori. Tidak menyimpan kode, salt, atau kunci berkas; hanya putusan penerbit dan waktunya. */
+/** Mock code book, in memory. It does not store the code, salt, or file key; only the issuer verdict and its time. */
 export class MockCodeBook implements CodeBookApi {
   readonly contract: string;
   private readonly now: () => number;
@@ -84,7 +84,7 @@ export class MockCodeBook implements CodeBookApi {
   at(): number {
     return this.now();
   }
-  /** Semua yang disimpan buku, untuk memeriksa bahwa kode dan salt tidak ada. */
+  /** Everything the book stores, to check that the code and salt are absent. */
   dump(): string {
     return JSON.stringify({ listings: [...this.listings.values()], purchases: [...this.purchases.values()].map(({ ciphertext: _c, ...p }) => p), verdicts: [...this.verdicts.entries()] });
   }
@@ -194,7 +194,7 @@ export class MockCodeBook implements CodeBookApi {
   }
 }
 
-/** Buku kode asli (BE-069) lewat HTTP: rute pembelian BE-056 yang sama, ditambah `POST /listings/{hash}/code-check`. */
+/** Real code book (BE-069) over HTTP: the same BE-056 purchase routes, plus `POST /listings/{hash}/code-check`. */
 export class HttpCodeBook extends LicenseBook implements CodeBookApi {
   /** `POST /listings/{hash}/takedown`: a claimant signs `{circle, listing_hash, claim, evidence_hash}`. A buyer of the listing is refused (`takedown_invalid`, B7-C1). */
   takedown(hash: string, claimant: CodeActor, claim: string, evidenceHash = ""): Promise<unknown> {
@@ -215,7 +215,7 @@ export class HttpCodeBook extends LicenseBook implements CodeBookApi {
 
 export type SoldCode = { listing: Listing; listingHash: string; doc: Required<CodeDocument>; docHash: string; code: string; salt: Uint8Array; ciphertext: Uint8Array; key: Uint8Array }
 
-/** Penjual menyiapkan kode: salt, enkripsi, dokumen (batas 20 credit dijaga SDK), dan listing bertanda tangan. Melempar `CodeError` dari SDK sebelum apa pun dikirim. */
+/** The seller prepares the code: salt, encryption, document (the 20 credit limit is enforced by the SDK), and signed listing. Throws `CodeError` from the SDK before anything is sent. */
 export async function listCode(book: CodeBookApi, seller: CodeActor, o: {
   code: string; issuer: string; verifiable: boolean; price: string; nonce: string; expiresAt: number; assetType?: string
 }): Promise<SoldCode> {
@@ -233,7 +233,7 @@ export async function listCode(book: CodeBookApi, seller: CodeActor, o: {
   return { listing, listingHash: listingHash(listing), doc, docHash, code: o.code, salt, ciphertext, key };
 }
 
-/** Pembeli membayar dengan voucher yang ditahan buku. */
+/** The buyer pays with a voucher that the book holds. */
 export function buyCode(book: CodeBookApi, buyer: InvoiceActor, sold: SoldCode, epoch: number, state: { seq: number; cumulative: string }): Promise<CodePurchase> {
   const voucher: UnsignedVoucher = {
     circle: book.contract, payer: buyer.account, payee: sold.listing.account, epoch, seq: state.seq + 1,
@@ -242,7 +242,7 @@ export function buyCode(book: CodeBookApi, buyer: InvoiceActor, sold: SoldCode, 
   return book.purchase(sold.listingHash, voucher, buyer.secretKey);
 }
 
-/** Penjual mencatat ciphertext, menunjukkan kode ke buku untuk cek penerbit (bila bisa dicek), lalu melepas kunci yang disegel. */
+/** The seller records the ciphertext, shows the code to the book for the issuer check (if it can be checked), then releases the sealed key. */
 export async function serveCode(book: CodeBookApi, seller: CodeActor, id: string, sold: SoldCode, source: ContentRef, buyer: CodeActor): Promise<CodePurchase> {
   const posted = { circle: book.contract, purchase_id: id, actor: seller.account, action: "cipher_posted", at: book.at(), source, cipher_hash: contentHash(sold.ciphertext) };
   await book.notice(id, posted, signJsonNotice(book.contract, posted, seller.secretKey));
@@ -294,8 +294,8 @@ export async function receiveCode(
 
 export type ProviderResponse = { status: number; body: string };
 /**
- * Proxy rahasia milik pemberi (mode self-hosted): meneruskan panggilan ke penyedia dengan kunci asli, menghapus kunci dari jawaban, dan menagih satu unit per panggilan yang
- * berhasil. Voucher kumulatif yang dikirim bersama panggilan baru dicatat bila penyedia menjawab di bawah 400; panggilan gagal tidak ditagih.
+ * Secret proxy owned by the grantor (self-hosted mode): forwards calls to the provider with the real key, strips the key from the response, and bills one unit per successful
+ * call. A cumulative voucher sent along with a new call is recorded if the provider answers below 400; failed calls are not billed.
  */
 export class SecretProxy {
   readonly unitPrice: string;
@@ -311,7 +311,7 @@ export class SecretProxy {
     this.buyerPublicKey = o.buyerPublicKey;
     this.provider = o.provider;
   }
-  /** Pengumuman 402 untuk satu panggilan: satuan `call`, jumlah 1. */
+  /** The 402 announcement for one call: unit `call`, amount 1. */
   announce(): { unit: string; quantity: string; unit_price: string; amount: string } {
     return { unit: "call", quantity: "1", unit_price: this.unitPrice, amount: this.unitPrice };
   }
@@ -331,7 +331,7 @@ export class SecretProxy {
   }
 }
 
-/** Pembeli membayar per panggilan: hitungan sendiri (`BuyerMeter`), voucher kumulatif di atas yang terdaftar, dan hanya panggilan yang sukses dihitung. */
+/** The buyer pays per call: own count (`BuyerMeter`), a cumulative voucher above the registered one, and only successful calls are counted. */
 export class SecretBuyer {
   readonly meter: BuyerMeter;
   readonly vouchers: Voucher[] = [];

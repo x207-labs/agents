@@ -7,7 +7,7 @@ const C = (n: number) => String(n * 1_000_000);
 const NOW = Math.floor(Date.parse("2026-11-04T10:00:00Z") / 1000);
 const side = (service: string, value = 100) => ({ service, calls: 10, value: C(value) });
 
-// Cincin A -> B -> C -> A: tiap agent menyediakan satu jasa dan membutuhkan jasa agent berikutnya (nilai seimbang).
+// Ring A -> B -> C -> A: each agent provides one service and needs the next agent's service (balanced value).
 const RING = [
   { name: "translator", offer: side("translate"), need: side("summarize") },
   { name: "summarizer", offer: side("summarize"), need: side("scrape") },
@@ -17,7 +17,7 @@ const ringTerms = (epoch = 42, amounts = [100, 100, 100]): BundleTerms => ({
   circle: CONTRACT,
   epoch,
   legs: [
-    // pembayar membayar penyedia jasa yang ia butuhkan: A bayar B, B bayar C, C bayar A
+    // the payer pays the provider of the service it needs: A pays B, B pays C, C pays A
     { payer: acct("translator"), payee: acct("summarizer"), max_amount: C(amounts[0]!) },
     { payer: acct("summarizer"), payee: acct("scraper"), max_amount: C(amounts[1]!) },
     { payer: acct("scraper"), payee: acct("translator"), max_amount: C(amounts[2]!) },
@@ -59,22 +59,22 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-012 intent offer/need and bundle proposa
     }
     const [proposal] = await m.book.proposals(acct("translator"), "ready");
     expect(proposal).toMatchObject({ termsHash: hash, status: "ready", missing: [] });
-    // jawaban kedua tidak menandatangani ulang
+    // the second answer does not sign again
     expect(await agents.get("translator")!.answerProposals()).toEqual([]);
   });
 
   it("TC-AG-012-03 a proposal that does not match is rejected and not signed", async () => {
     const { m, agents } = await setup();
     for (const r of RING) await agents.get(r.name)!.postIntent(r.offer, r.need);
-    // translator harus membayar 120 padahal kebutuhannya bernilai 100
+    // translator would have to pay 120 although its need is worth 100
     const overpay = await m.injectProposal(ringTerms(42, [120, 100, 100]));
     expect(await agents.get("translator")!.answerProposals()).toEqual([{ termsHash: overpay, action: "rejected", reason: "overpay" }]);
-    // summarizer menerima 120 dan membayar 100: cocok
+    // summarizer receives 120 and pays 100: match
     expect(await agents.get("summarizer")!.answerProposals()).toEqual([{ termsHash: overpay, action: "signed" }]);
     const [proposal] = await m.book.proposals(acct("translator"), "proposed");
     expect(proposal!.missing).toEqual([acct("translator"), acct("scraper")].sort());
 
-    // agent yang menerima kurang dari nilai penawarannya menolak
+    // an agent that receives less than its offer value rejects
     const underpaid = await m.injectProposal(ringTerms(42, [100, 100, 80]));
     const answers = await agents.get("translator")!.answerProposals();
     expect(answers.find((a) => a.termsHash === underpaid)).toEqual({ termsHash: underpaid, action: "rejected", reason: "underpaid" });

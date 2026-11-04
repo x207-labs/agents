@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// AG-006: kode agent hanya boleh memakai paket publik x207/x402 (@x402/fetch, @x207/scheme, @x207/core)
-// dan berkas di repo ini. Import ke path internal paket atau kode repo lain gagal. Dependency pihak ketiga
-// non-x207 tidak dilarang (K-48). Folder `test/` dikecualikan: test boleh memakai harness repo lain.
+// AG-006: agent code may only use public x207/x402 packages (@x402/fetch, @x207/scheme, @x207/core)
+// and files in this repo. Imports of package internal paths or other repo code fail. Non-x207 third-party
+// dependencies are not forbidden (K-48). The `test/` folder is excluded: tests may use the harness of other repos.
 //
-// Pakai: node scripts/check-imports.mjs   (exit 1 bila ada pelanggaran)
+// Usage: node scripts/check-imports.mjs   (exit 1 if there are violations)
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,7 @@ function* sourceFiles(dir) {
   }
 }
 
-/** Daftar pelanggaran `{ file, specifier, reason }` di bawah `root`. */
+/** List of violations `{ file, specifier, reason }` under `root`. */
 export function findViolations(rootDir) {
   const root = resolve(rootDir);
   const violations = [];

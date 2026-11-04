@@ -49,7 +49,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-019 varied asset scenario on the marketp
   it("TC-AG-019-02 a pair with mismatched values does not become a bundle", async () => {
     market = await startMarketBook(AGENT_NAMES, { now: NOW * 1000 });
     const m = market;
-    // pembeli hanya mau membayar 40% dari nilai listing: di bawah batas bawah penjual
+    // the buyer only agrees to pay 40% of the listing value: below the seller lower bound
     const stingy = [{ ...ASSET_PAIRS[0]!, buyerMaxUnitValue: "4000000" }];
     const report = await runAssetScenario({ book: m.book, identities: m.identities, contractId: CONTRACT, now: () => NOW, pairs: stingy });
     expect(report.pairs[0]!.steps).toContain("rejected");

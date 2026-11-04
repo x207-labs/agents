@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-// @ts-expect-error skrip .mjs tanpa tipe
+// @ts-expect-error .mjs script without types
 import { findViolations } from "../scripts/check-imports.mjs";
 
 const repo = fileURLToPath(new URL("..", import.meta.url));

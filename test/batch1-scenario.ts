@@ -1,7 +1,7 @@
-// Skenario sepuluh jenis aset on-chain batch 1 (AG-023, katalog 1 sampai 10) di kontrak: tiap jenis dibuat dari template SDK (SD-061), ditawarkan (`offer_grant`), dititipkan,
-// dibeli dengan voucher (`complete_escrow`), dan diperiksa di sisi aset (pemilik NFT, saldo token). Tiap kelompok (NFT, token NEP-141, multi-token) juga punya satu listing
-// tidak sah yang ditolak, sekali oleh template (kode galat SDK) dan sekali oleh kontrak (titipan yang tidak cocok dengan scope). Berkas ini di `test/` karena yang dikirimnya adalah
-// tindakan pemilik (titipan, penerimaan), di luar kebijakan agent AG-007.
+// Scenario of ten on-chain asset kinds, batch 1 (AG-023, catalog 1 to 10) in the contract: each kind is created from an SDK template (SD-061), offered (`offer_grant`), escrowed,
+// bought with a voucher (`complete_escrow`), and checked on the asset side (NFT owner, token balance). Each group (NFT, NEP-141 token, multi-token) also has one invalid
+// listing that is rejected, once by the template (SDK error code) and once by the contract (an escrow that does not match the scope). This file is in `test/` because what it sends is
+// owner actions (deposit, acceptance), outside the AG-007 agent policy.
 import { buildAssetTemplate, signVoucher, AssetTemplateError, type AccountId, type AssetInput, type ContractCall } from "@x207/core";
 
 export type Send = (account: AccountId, call: ContractCall & { gas?: bigint }) => Promise<{ failures: string[]; logs: string[]; value: unknown }>;
@@ -12,7 +12,7 @@ export type Batch1World = {
   buyerVoucherKey: `ed25519:${string}`;
   epoch: number;
   nft: AccountId;
-  /** Tokens NEP-141 (mock) untuk jenis ft, rwa dan lst. */
+  /** Mock NEP-141 tokens for kinds ft, rwa and lst. */
   tokens: { ft: AccountId; rwa: AccountId; lst: AccountId };
   mt: AccountId;
   send: Send;
@@ -23,7 +23,7 @@ export type Batch1Step = { kind: string; step: string; ok: boolean; detail: stri
 const PRICE = "1000000"; // 1 credit per purchase
 export const BATCH1_KINDS = ["nft", "ticket", "game-item", "coupon", "license", "ft", "rwa", "lst", "intents-balance", "pool-share"] as const;
 
-/** Argumen `AssetInput` dari sepuluh jenis. `now` dalam detik unix. NFT `t1` sampai `t5` harus sudah dimiliki pemberi. */
+/** `AssetInput` arguments for the ten kinds. `now` in unix seconds. NFTs `t1` to `t5` must already be owned by the grantor. */
 export function batch1Inputs(w: Pick<Batch1World, "nft" | "tokens" | "mt">, now: number): Record<(typeof BATCH1_KINDS)[number], AssetInput> {
   const common = { unitPrice: PRICE, expiresAt: now + 6 * 3600 };
   const nft = (tokenId: string) => ({ nftContract: w.nft, tokenId });

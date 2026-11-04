@@ -1,5 +1,5 @@
-// CLI: `npm run agent -- onboarding/run.ts` dengan variabel di .env.example bagian Onboarding.
-// Kunci pemilik dibaca dari <KEYS_DIR>/<NETWORK>/<akun>.json (format skrip akun payung); tidak ada rahasia dicetak.
+// CLI: `npm run agent -- onboarding/run.ts` with the variables in .env.example under Onboarding.
+// The owner key is read from <KEYS_DIR>/<NETWORK>/<account>.json (umbrella account script format); no secret is printed.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createNearSender, createNearView } from "@x207/core/signer";

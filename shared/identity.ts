@@ -1,13 +1,13 @@
-// Identitas agent: kunci voucher ed25519 (ADR-06, bukan access key NEAR) dan kebijakan belanja dari pemilik (FX-AG-4).
-// Disimpan per akun di <keysDir>/<network>/<account>.agent.json dengan mode 0600; rahasia tidak pernah dicetak.
+// Agent identity: ed25519 voucher key (ADR-06, not a NEAR access key) and the owner spend policy (FX-AG-4).
+// Stored per account at <keysDir>/<network>/<account>.agent.json with mode 0600; the secret is never printed.
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-/** Batas belanja dalam satuan terkecil credit (6 desimal), string desimal. */
+/** Spend limits in credit smallest units (6 decimals), decimal string. */
 export type SpendPolicy = {
-  /** Batas per panggilan berbayar. */
+  /** Limit per paid call. */
   maxPerCall: string;
-  /** Batas total per epoch. */
+  /** Total limit per epoch. */
   maxPerEpoch: string;
 };
 
@@ -50,7 +50,7 @@ export function saveIdentity(keysDir: string, network: string, identity: AgentId
   return file;
 }
 
-/** Baca identitas agent saat agent mulai; `null` bila belum di-onboard. */
+/** Read the agent identity when the agent starts; `null` if not yet onboarded. */
 export function loadIdentity(keysDir: string, network: string, accountId: string): AgentIdentity | null {
   const file = identityPath(keysDir, network, accountId);
   if (!existsSync(file)) return null;

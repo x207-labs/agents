@@ -1,16 +1,16 @@
-// Skenario barter melingkar A, B, C (AG-013, F5): tiap agent memasang intent offer/need, solver menemukan cincin A -> B -> C -> A, ketiganya
-// menandatangani `terms_hash`, bundle di-commit, lalu setiap leg dibayar dengan voucher F2 yang membawa `bundle_id` (headroom cadangan)
-// sampai leg penuh. Di kliring F3 ketiga leg saling menghapus penuh dan residual tiap anggota nol. Modul ini memegang definisi cincin dan
-// pembayaran leg; orkestrasi dengan solver dan kontrak ada di tests/barter.sandbox.test.ts (UM-055).
+// Circular barter scenario A, B, C (AG-013, F5): each agent places an offer/need intent, the solver finds the ring A -> B -> C -> A, all three
+// sign `terms_hash`, the bundle is committed, then each leg is paid with an F2 voucher that carries `bundle_id` (reserved headroom)
+// until the leg is full. In F3 clearing the three legs cancel fully and each member's residual is zero. This module holds the ring definition and
+// the leg payments; the orchestration with the solver and contract is in tests/barter.sandbox.test.ts (UM-055).
 import { AGENTS, type AgentName } from "../shared/registry.ts";
 
-/** Harga satu panggilan default (0,02 credit, FX-04). */
+/** Default price of one call (0.02 credit, FX-04). */
 export const CALL_PRICE = 20_000;
-/** Panggilan per leg: 5 × 0,02 = 0,1 credit. */
+/** Calls per leg: 5 × 0.02 = 0.1 credit. */
 export const CALLS_PER_LEG = 5;
 export const LEG_AMOUNT = CALL_PRICE * CALLS_PER_LEG;
 
-/** Cincin: tiap anggota menyediakan satu jasa dan membutuhkan jasa anggota berikutnya; semua bernilai sama (seimbang). */
+/** Ring: each member provides one service and needs the next member's service; all have equal value (balanced). */
 export const RING_MEMBERS = ["translator", "summarizer", "scraper"] as const satisfies readonly AgentName[];
 
 export type RingSide = { service: string; calls: number; value: string };
@@ -18,7 +18,7 @@ export type RingIntent = { agent: AgentName; offer: RingSide; need: RingSide };
 
 const side = (agent: AgentName): RingSide => ({ service: AGENTS[agent].verb, calls: CALLS_PER_LEG, value: String(LEG_AMOUNT) });
 
-/** translator menawarkan `translate` dan butuh `summarize`, dst. mengikuti urutan cincin. */
+/** translator offers `translate` and needs `summarize`, and so on following the ring order. */
 export function ringIntents(): RingIntent[] {
   return RING_MEMBERS.map((agent, i) => ({
     agent,
@@ -29,14 +29,14 @@ export function ringIntents(): RingIntent[] {
 
 export type LegPlan = { buyer: AgentName; seller: AgentName; calls: number };
 
-/** Pembayaran leg: pembeli membayar penyedia jasa yang ia butuhkan, `CALLS_PER_LEG` panggilan. */
+/** Leg payment: the buyer pays the provider of the service it needs, `CALLS_PER_LEG` calls. */
 export function legPayments(): LegPlan[] {
   return RING_MEMBERS.map((buyer, i) => ({ buyer, seller: RING_MEMBERS[(i + 1) % RING_MEMBERS.length]!, calls: CALLS_PER_LEG }));
 }
 
 export type PayFn = (buyer: AgentName, seller: AgentName) => Promise<Response>;
 
-/** Jalankan semua pembayaran leg lewat `pay`; melempar bila ada yang bukan HTTP 200. Mengembalikan jumlah kumulatif per pasangan. */
+/** Run all leg payments through `pay`; throws if any is not HTTP 200. Returns the cumulative amount per pair. */
 export async function payLegs(pay: PayFn): Promise<Record<string, bigint>> {
   const cumulative: Record<string, bigint> = {};
   for (const { buyer, seller, calls } of legPayments()) {

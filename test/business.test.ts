@@ -7,7 +7,7 @@ const requirement = (amount: string) => [
   { scheme: "exact", network: "near:mainnet", amount: "20000", asset: "USD" },
 ];
 
-// Penjual tiruan: harga per jalur; panggilan tanpa header pembayaran mendapat 402, panggilan berbayar mendapat 200.
+// Mock seller: price per path; a call without a payment header gets 402, a paid call gets 200.
 function market(prices: Record<string, string>) {
   const unpaid: string[] = [];
   const paid: string[] = [];

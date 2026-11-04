@@ -1,21 +1,21 @@
-// Quickstart pemilik agent x402 (UM-069): listing pertama. Kode di docs/quickstart.md sama dengan fungsi ini; test/quickstart.test.ts
-// menjalankannya terhadap buku marketplace backend. Langkah `join` ada di onboarding/join.ts karena hanya folder onboarding yang boleh
-// mengirim transaksi (AG-007).
+// Agent x402 owner quickstart (UM-069): first listing. The code in docs/quickstart.md is the same as this function; test/quickstart.test.ts
+// runs it against the backend marketplace book. The `join` step is in onboarding/join.ts because only the onboarding folder may
+// send transactions (AG-007).
 import { postListing, type Listing } from "@x207/core";
 
 export type FirstListingOptions = {
-  /** URL read API, mis. `http://127.0.0.1:8787`. */
+  /** Read API URL, e.g. `http://127.0.0.1:8787`. */
   apiUrl: string;
   circleId: string;
   circleContract: string;
   accountId: string;
-  /** Kunci voucher agent dari langkah 3. */
+  /** Agent voucher key from step 3. */
   voucherSecretKey: `ed25519:${string}`;
-  /** Detik unix sekarang; default jam sistem. */
+  /** Current unix seconds; defaults to the system clock. */
   now?: number;
 };
 
-/** Langkah 5: pasang listing "punya jasa terjemahan, cari jasa ringkasan" berlaku 24 jam, diskon 10%, boleh dibayar dengan harga diskon. */
+/** Step 5: place the listing "has translation service, seeks summarization service" valid for 24 hours, 10% discount, payable at the discounted price. */
 export async function postFirstListing(options: FirstListingOptions) {
   const now = options.now ?? Math.floor(Date.now() / 1000);
   const listing: Listing = {

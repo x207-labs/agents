@@ -23,7 +23,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("UM-069 quickstart: the first listing", () =
       offer: { assetType: "service:translate-calls", assetClass: "D" },
     });
     expect(created.expiresAt).toBe("2026-11-05T10:00:00Z");
-    // hash dari kode quickstart sama dengan hash SDK atas isi yang sama
+    // hash of the quickstart code equals the SDK hash over the same content
     const same: Listing = {
       circle: CONTRACT, account: acct("translator"),
       offer: { asset_type: "service:translate-calls", asset_class: "D", quantity: 10, value: "200000" },

@@ -1,7 +1,7 @@
-// Kebijakan marketplace agent (AG-016, F9): membuat listing dari barang dan kebutuhan pemilik, menilai tawaran, tawar balik, terima atau tolak.
-// Keputusan dasar adalah aturan deterministik dari kebijakan pemilik ("mode mock"). Dengan klien LLM `live`, model boleh mengusulkan
-// keputusan, tetapi usulan yang melanggar batas kebijakan (nilai di bawah lantai atau di atas plafon, kata aksi tak dikenal) dibuang
-// dan aturan dasar yang dipakai: kebijakan pemilik selalu menang atas keluaran model.
+// Agent marketplace policy (AG-016, F9): create listings from the owner's goods and needs, judge offers, counter, accept or reject.
+// The base decision is a deterministic rule from the owner's policy ("mock mode"). With a `live` LLM client, the model may propose
+// a decision, but a proposal that violates the policy limits (value below the floor or above the ceiling, unknown action word) is dropped
+// and the base rule is used: the owner's policy always wins over model output.
 import {
   ASSET_CLASSES, listingHash, planOffer, signBundle, signListing, signOffer, signReferral, signRefuseReferral, termsHash,
   type AssetClass, type Listing, type Offer, type Referral,
@@ -11,31 +11,31 @@ import type { SeekerPlan } from "./seeker.ts";
 import type { AgentIdentity } from "./identity.ts";
 import type { LlmClient } from "./nearai.ts";
 
-/** Barang yang pemilik punya dan boleh dilepas. `unitValue` dalam credit satuan terkecil per unit. */
+/** Goods the owner holds and may release. `unitValue` is in credit smallest units per unit. */
 export type Holding = { assetType: string; assetClass: AssetClass; quantity: number; unitValue: string };
-/** Kebutuhan pemilik; `maxUnitValue` batas harga per unit yang mau dibayar. */
+/** The owner's need; `maxUnitValue` is the price limit per unit they are willing to pay. */
 export type Need = { assetType: string; assetClass: AssetClass; quantity: number; maxUnitValue: string };
 
 export type BarterPolicy = {
   holdings: Holding[];
   needs: Need[];
-  /** Diskon barter cepat pada listing, bps dari nilai `offer`. */
+  /** Quick barter discount on the listing, bps of the `offer` value. */
   discountBps: number;
   acceptPayment: boolean;
   discoverable: boolean;
   listingTtlSeconds: number;
-  /** Penjual: terima tawaran bernilai paling sedikit bagian ini dari nilai `offer` listing (bps). */
+  /** Seller: accept an offer worth at least this share of the listing `offer` value (bps). */
   minAcceptBps: number;
-  /** Penjual: tolak langsung tawaran di bawah bagian ini (bps), tanpa tawar balik. */
+  /** Seller: reject outright an offer below this share (bps), with no counter. */
   rejectBelowBps: number;
-  /** Penawar: tawaran pembuka sebagai bagian dari nilai `offer` listing (bps). */
+  /** Bidder: opening bid as a share of the listing `offer` value (bps). */
   openingBps: number;
-  /** Besar konsesi per ronde (bps dari nilai `offer` listing). */
+  /** Size of the concession per round (bps of the listing `offer` value). */
   stepBps: number;
   maxRounds: number;
-  /** Opt-in ajakan pencari (SV-016): tanpa ini setiap ajakan di kotak masuk ditolak. */
+  /** Seeker referral opt-in (SV-016): without it every referral in the inbox is rejected. */
   acceptReferrals: boolean;
-  /** Penjual: batas jumlah per pesanan tidak boleh melebihi listing; selalu berlaku. */
+  /** Seller: the quantity per order must not exceed the listing; always enforced. */
   deliverDays: number;
 };
 
@@ -64,19 +64,19 @@ export type Decision =
   | { action: "reject"; reason: string };
 
 export type DecisionContext = {
-  /** Peran agent dalam utas ini. */
+  /** The agent's role in this thread. */
   role: "seller" | "buyer";
   listing: Pick<Listing, "offer" | "want" | "accept_payment" | "expires_at">;
-  /** Tawaran yang masuk dan menunggu jawaban agent ini. */
+  /** Incoming offer waiting for this agent's answer. */
   offer: Pick<Offer, "round" | "mode" | "value" | "quantity">;
-  /** Nilai tawaran terakhir milik agent sendiri di utas ini (penawar), bila ada. */
+  /** The agent's own latest offer value in this thread (bidder), if any. */
   ownLastValue?: string;
   policy: BarterPolicy;
   /** Detik unix. */
   now: number;
 };
 
-/** Aturan dasar. Penjual: terima di atas lantai, tolak di bawah batas bawah, selain itu tawar balik turun dari harga listing per ronde. */
+/** Base rule. Seller: accept above the floor, reject below the lower bound, otherwise counter downward from the listing price each round. */
 export function decideRule(ctx: DecisionContext): Decision {
   const { listing, offer, policy } = ctx;
   const listed = BigInt(listing.offer.value);
@@ -90,13 +90,13 @@ export function decideRule(ctx: DecisionContext): Decision {
     if (value >= floor) return { action: "accept" };
     if (value < bps(listed, policy.rejectBelowBps)) return { action: "reject", reason: "too_low" };
     if (offer.round >= policy.maxRounds) return { action: "reject", reason: "max_rounds" };
-    // Konsesi mulai dari harga listing: ronde 2 menurunkan satu langkah, dst., tidak pernah di bawah lantai.
+    // Concession starts at the listing price: round 2 steps down once, and so on, never below the floor.
     const asked = listed - bps(listed, policy.stepBps) * BigInt(Math.max(1, Math.floor(offer.round / 2)));
     const counter = asked > floor ? asked : floor;
     return counter <= value ? { action: "accept" } : { action: "counter", value: counter.toString() };
   }
 
-  // Penawar menilai tawaran balik penjual: terima bila tidak melebihi plafon kebutuhan.
+  // The bidder judges the seller's counter-offer: accept if it does not exceed the need ceiling.
   const need = policy.needs.find((n) => n.assetType === listing.offer.asset_type);
   const ceiling = need ? BigInt(need.maxUnitValue) * BigInt(Math.min(need.quantity, listing.offer.quantity)) : bps(listed, policy.minAcceptBps);
   const cap = ceiling < listed ? ceiling : listed;
@@ -113,7 +113,7 @@ function validAgainstPolicy(decision: Decision, ctx: DecisionContext): boolean {
   if (decision.action === "reject") return typeof decision.reason === "string";
   const listed = BigInt(ctx.listing.offer.value);
   if (decision.action === "accept") {
-    // Menerima tawaran di bawah lantai penjual atau di atas plafon penawar melanggar kebijakan.
+    // Accepting an offer below the seller floor or above the bidder ceiling violates the policy.
     return decideRule(ctx).action === "accept";
   }
   if (!/^[1-9]\d*$/.test(decision.value)) return false;
@@ -121,7 +121,7 @@ function validAgainstPolicy(decision: Decision, ctx: DecisionContext): boolean {
   return ctx.role === "seller" ? value >= bps(listed, ctx.policy.minAcceptBps) && value <= listed : value > 0n && value <= listed;
 }
 
-/** Keputusan LLM live bila sah menurut kebijakan; selain itu aturan dasar. */
+/** The live LLM decision if valid under the policy; otherwise the base rule. */
 export async function decide(ctx: DecisionContext, llm?: LlmClient): Promise<Decision & { source: "rule" | "llm" }> {
   const base = decideRule(ctx);
   if (!llm || llm.mode !== "live") return { ...base, source: "rule" };
@@ -134,14 +134,14 @@ export async function decide(ctx: DecisionContext, llm?: LlmClient): Promise<Dec
     const parsed = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as Decision;
     if (parsed && ["accept", "counter", "reject"].includes(parsed.action) && validAgainstPolicy(parsed, ctx)) return { ...parsed, source: "llm" };
   } catch {
-    // keluaran model tidak terbaca: pakai aturan dasar
+    // model output is unreadable: use the base rule
   }
   return { ...base, source: "rule" };
 }
 
 const NONCE = /[^A-Za-z0-9_-]/g;
 
-/** Listing dari satu barang dan satu kebutuhan pemilik; nilai = harga satuan × jumlah. */
+/** Listing from one good and one need of the owner; value = unit price × quantity. */
 export function buildListing(args: {
   identity: AgentIdentity;
   contractId: string;
@@ -173,7 +173,7 @@ export function buildListing(args: {
   };
 }
 
-/** Listing dari buku yang cocok dengan kebutuhan agent: `offer` listing = kebutuhan dan `want` listing = barang yang agent punya. */
+/** Listing from the book that matches the agent's need: the listing `offer` = the need and the listing `want` = the goods the agent holds. */
 export function matchesPolicy(listing: Pick<ListingView, "offer" | "want" | "account">, self: string, policy: BarterPolicy): "barter" | "pay" | null {
   if (listing.account === self) return null;
   const need = policy.needs.find((n) => n.assetType === listing.offer.assetType && n.assetClass === listing.offer.assetClass);
@@ -198,7 +198,7 @@ export type PolicyAgentOptions = {
   now?: () => number;
 };
 
-/** Agent yang menjalankan kebijakan marketplace pemiliknya terhadap buku listing. */
+/** An agent that runs its owner's marketplace policy against the listing book. */
 export class PolicyAgent {
   readonly identity: AgentIdentity;
   readonly book: BookClient;
@@ -219,7 +219,7 @@ export class PolicyAgent {
     this.#now = options.now ?? (() => Math.floor(Date.now() / 1000));
   }
 
-  /** Pasang listing dari barang dan kebutuhan pemilik. */
+  /** Place listings from the owner's goods and needs. */
   async list(holding = 0, need = 0): Promise<{ listing: Listing; hash: string }> {
     const nonce = `${this.identity.accountId.split(".")[0]}-${this.#now()}-${(this.#counter += 1)}`;
     const listing = buildListing({ identity: this.identity, contractId: this.#contractId, policy: this.policy, now: this.#now(), nonce, holding, need });
@@ -250,8 +250,8 @@ export class PolicyAgent {
   }
 
   /**
-   * Pencari: tandatangani ajakan dari rencana `SeekerBot` dan kirim ke kotak masuk agent tujuan. Penawarannya tetap harus ditandatangani
-   * agent tujuan sendiri (`handleReferrals`). `ttlSeconds` default 1 jam.
+   * Seeker: sign the referral from the `SeekerBot` plan and send it to the target agent's inbox. The offer itself must still be signed
+   * by the target agent itself (`handleReferrals`). `ttlSeconds` defaults to 1 hour.
    */
   async sendReferral(plan: SeekerPlan, searcherShareBps: number, ttlSeconds = 3600): Promise<ReferralView> {
     const referral: Referral = {
@@ -264,8 +264,8 @@ export class PolicyAgent {
   }
 
   /**
-   * Agent tujuan: jawab ajakan di kotak masuk. Ajakan yang cocok dengan kebutuhan agent dan kebijakan `acceptReferrals` dijawab dengan
-   * penawaran ronde 1 buatan agent sendiri yang merujuk ajakan (jatah pencari melekat di utas); selain itu ditolak dengan tanda tangan.
+   * Target agent: answer referrals in the inbox. A referral that matches the agent's need and the `acceptReferrals` policy is answered with
+   * a round 1 offer made by the agent itself that cites the referral (the seeker's share is attached to the thread); otherwise it is rejected with a signature.
    */
   async handleReferrals(): Promise<Array<{ referralHash: string; action: "bid" | "refused"; reason?: string; offerHash?: string }>> {
     const answers: Array<{ referralHash: string; action: "bid" | "refused"; reason?: string; offerHash?: string }> = [];
@@ -285,7 +285,7 @@ export class PolicyAgent {
     return answers;
   }
 
-  /** Cari listing yang cocok dengan kebutuhan dan ajukan tawaran pembuka (ronde 1). */
+  /** Find listings that match the need and make an opening offer (round 1). */
   async shop(): Promise<StepResult[]> {
     const results: StepResult[] = [];
     for (const view of await this.book.listings({ status: "open" })) {
@@ -304,8 +304,8 @@ export class PolicyAgent {
   }
 
   /**
-   * Kirim penawaran ronde 1 dari ajakan pencari (SV-015): nilai = nilai listing, cara dan jumlah dari rencana pencari. Hanya agent
-   * yang sudah opt-in yang memanggil ini; penawaran ditandatangani agent sendiri.
+   * Send a round 1 offer from a seeker referral (SV-015): value = listing value, method and quantity from the seeker plan. Only agents
+   * that opted in call this; the offer is signed by the agent itself.
    */
   async bidFromReferral(plan: { listing: ListingView; mode: "pay" | "barter"; value: string; quantity: number }): Promise<StepResult> {
     const offer = await this.#postOffer(plan.listing, 1, plan.mode, plan.value, plan.quantity);
@@ -313,8 +313,8 @@ export class PolicyAgent {
   }
 
   /**
-   * Jawab penawaran di kotak masuk menurut kebijakan: terima, tawar balik, atau tolak. `referral` menyebut pencari yang membawa
-   * penawaran itu (bila ada); jatahnya menjadi leg di bundle yang sama.
+   * Answer an offer in the inbox according to the policy: accept, counter, or reject. `referral` names the seeker that brought
+   * the offer (if any); their share becomes a leg in the same bundle.
    */
   async handleInbox(options: { referral?: (offer: OfferView) => { searcher: string; searcherShareBps: number } | undefined } = {}): Promise<StepResult[]> {
     const results: StepResult[] = [];
@@ -344,8 +344,8 @@ export class PolicyAgent {
   }
 
   /**
-   * Tandatangani usulan bundle dari negosiasi agent ini hanya bila syaratnya sama dengan hitungan lokal `planOffer` atas listing dan
-   * penawaran yang diterima (jatah pencari dibaca dari leg pencari). Usulan lain ditolak.
+   * Sign a bundle proposal from this agent's negotiation only if its terms equal the local `planOffer` computation over the listing and
+   * the accepted offer (the seeker share is read from the seeker leg). Other proposals are rejected.
    */
   async signProposals(): Promise<Array<{ termsHash: string; action: "signed" | "rejected"; reason?: string }>> {
     const account = this.identity.accountId;
@@ -366,10 +366,10 @@ export class PolicyAgent {
       };
       const searcher = proposal.participants.find((p) => p !== view.account && p !== accepted.counterparty);
       const leg = searcher ? proposal.terms.legs.find((l) => l.payee === searcher) : undefined;
-      // Jatah pencari dihitung dari nilai kesepakatan (Offer.value penawaran yang diterima).
+      // The seeker share is computed from the deal value (Offer.value of the accepted offer).
       const listed = BigInt(accepted.value);
       const base = leg ? Number((BigInt(leg.max_amount) * BPS) / listed) : 0;
-      // Pembulatan ke bawah saat server menghitung jatah: coba bps terdekat yang menghasilkan jumlah leg yang sama.
+      // Rounding down when the server computes the share: try the nearest bps that yields the same leg amount.
       const candidates = leg ? [base, base + 1] : [0];
       const served = termsHash(proposal.terms) === proposal.termsHash;
       const match = served && candidates.some((share) => {

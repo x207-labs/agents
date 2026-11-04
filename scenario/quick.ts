@@ -1,7 +1,7 @@
-// Skenario barter cepat (AG-018, F9): Andi, agent idle, memasang dua listing berdiskon 10% dari nilai 100. Pencari mendatangi dua agent
-// idle yang opt-in: Budi membayar dengan harga diskon (jalur bayar), Citra menyerahkan barang dan menerima cashback (jalur barter).
-// Angka contoh note F9 adalah parameter: nilai 100, diskon 1000 bps, jatah pencari 300 bps. Bayar: lawan 93 = 90 ke Andi + 3 ke pencari.
-// Barter: Citra menyerahkan barang senilai 100 dan menerima barang Andi + cashback 7; Andi menanggung 10; pencari 3.
+// Quick barter scenario (AG-018, F9): Andi, an idle agent, places two listings with a 10% discount from a value of 100. The seeker visits two
+// idle agents that opted in: Budi pays at the discounted price (pay path), Citra hands over goods and receives cashback (barter path).
+// The example numbers of note F9 are parameters: value 100, discount 1000 bps, seeker share 300 bps. Pay: counterparty 93 = 90 to Andi + 3 to the seeker.
+// Barter: Citra hands over goods worth 100 and receives Andi's goods + cashback 7; Andi bears 10; seeker 3.
 import { DEFAULT_BARTER_POLICY, PolicyAgent, type BarterPolicy } from "../shared/barter-policy.ts";
 import type { BookClient, BundleProposalView } from "../shared/barter.ts";
 import type { AgentIdentity } from "../shared/identity.ts";
@@ -26,7 +26,7 @@ export type QuickReport = {
   pay: { legs: Array<{ from: string; to: string; amount: string }>; counterpartyPays: string; status: string } | null;
   barter: { legs: Array<{ from: string; to: string; amount: string }>; cashback: string; sellerBears: string; status: string } | null;
   seekerRevenue: string;
-  /** Agent yang tidak opt-in atau sudah dikunjungi sebanyak batas tidak mendapat ajakan. */
+  /** An agent that did not opt in or was already visited up to the limit gets no referral. */
   skipped: string[];
 };
 
@@ -35,7 +35,7 @@ export async function runQuickBarter(args: {
   contractId: string;
   identities: { seller: AgentIdentity; payer: AgentIdentity; barterer: AgentIdentity; seeker: AgentIdentity; bystander: AgentIdentity };
   now: () => number;
-  /** Parameter hitungan (default contoh note F9: 100, 1000 bps, 300 bps); nilai dalam credit utuh. */
+  /** Calculation parameters (default from the note F9 example: 100, 1000 bps, 300 bps); value in whole credits. */
   params?: QuickParams;
 }): Promise<QuickReport> {
   const { book, identities, contractId, now } = args;
@@ -57,7 +57,7 @@ export async function runQuickBarter(args: {
   await andiPay.list();
   await andiBarter.list();
 
-  // Budi butuh jasa terjemahan dan membayar dengan credit; Citra butuh paket terjemahan dan menyerahkan jasa scrape
+  // Budi needs a translation service and pays with credit; Citra needs a translation package and hands over the scrape service
   const budi = make(identities.payer, {
     ...DEFAULT_BARTER_POLICY,
     needs: [{ assetType: "service:translate-calls", assetClass: "D", quantity: 10, maxUnitValue: unit(value / 10) }],
@@ -71,13 +71,13 @@ export async function runQuickBarter(args: {
   const visited: VisitedAgent[] = [
     { account: identities.payer.accountId, optIn: true, idle: true, canPay: true, offers: [] },
     { account: identities.barterer.accountId, optIn: true, idle: true, canPay: false, offers: [{ assetType: "service:scrape-calls", assetClass: "D", quantity: 10 }] },
-    // tidak opt-in: tidak pernah dikunjungi
+    // not opted in: never visited
     { account: identities.bystander.accountId, optIn: false, idle: true, canPay: true, offers: [] },
   ];
   const bot = new SeekerBot({ seeker: identities.seeker.accountId, searcherShareBps: params.searcherShareBps, maxOffersPerAgent: 1, periodSeconds: 3600 });
   const plans: SeekerPlan[] = bot.plan(await book.listings({ status: "open" }), visited, now());
 
-  // Pencari mengirim ajakan bertanda tangan ke kotak masuk; agent tujuan menawar sendiri; pemasang menerima dan jatah melekat dari ajakan
+  // The seeker sends a signed referral to the inbox; the target agent bids itself; the lister accepts and the share attaches from the referral
   for (const plan of plans) {
     await seeker.sendReferral(plan, params.searcherShareBps);
     bot.record(plan.to, now());

@@ -1,5 +1,5 @@
-// AG-008 di near-sandbox: kebijakan belanja pemilik menjadi pagar klien. Panggilan yang melewati batas ditolak sebelum voucher
-// ditandatangani, jadi tidak sampai ke facilitator dan tidak ada kewajiban on-chain, padahal headroom kontrak masih cukup.
+// AG-008 on near-sandbox: the owner spend policy becomes the client guard. A call that crosses the limit is rejected before the voucher
+// is signed, so it never reaches the facilitator and there is no on-chain obligation, even though the contract headroom is still enough.
 import { afterAll, describe, expect, it } from "vitest";
 import { AGENTS } from "../shared/registry.ts";
 import { createAgentBuyer } from "../shared/x207.ts";
@@ -15,7 +15,7 @@ describe.skipIf(!sandboxAvailable)("AG-008 client-side spend fence", () => {
   it("TC-AG-008-01 the third purchase over the epoch budget is rejected by the client; the contract sees only two payments", async () => {
     stack = await startStack();
     const { fx, identity, urls } = stack;
-    // limit on-chain 40 credit, tetapi pemilik membatasi 0,04 per epoch dan 0,02 per panggilan
+    // on-chain limit 40 credit, but the owner caps 0.04 per epoch and 0.02 per call
     const policy = { maxPerCall: "20000", maxPerEpoch: "40000" };
     const buyer = createAgentBuyer({ ...identity.gpu, policy }, { rpcUrls: [fx.sandbox.rpcUrl] });
     const call = (seller: "translator" | "summarizer" | "cleaner") => buyer(`${urls[seller]}/api/${AGENTS[seller].verb}?input=hello`);

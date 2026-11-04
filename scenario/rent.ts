@@ -1,6 +1,6 @@
-// Agen penyewa akses harian (AG-028, pipeline P2, ADR-47) dengan format SDK (SD-071): membayar satu hari di depan lewat x402 ke broker, dan hanya menandatangani voucher hari berikutnya bila
-// broker mengatakan akses MASIH berjalan (`DailyRent.checkBeforeNextDay`); biaya nyata per hari ditagih dengan voucher terpisah (`signBill`) dan di atas `daily_cap` tidak ditandatangani.
-// Kode ini hanya memakai paket publik (`@x207/scheme`, `@x207/core`) dan HTTP ke broker; yang dilakukan kontrak (mendaftarkan voucher) dimainkan oleh pemanggil.
+// Daily access renter agent (AG-028, pipeline P2, ADR-47) in the SDK format (SD-071): pays one day ahead through x402 to the broker, and only signs the next day's voucher if
+// the broker says the access is STILL running (`DailyRent.checkBeforeNextDay`); the real cost per day is billed with a separate voucher (`signBill`) and is not signed above `daily_cap`.
+// This code only uses the public packages (`@x207/scheme`, `@x207/core`) and HTTP to the broker; what the contract does (registering vouchers) is played by the caller.
 import { createHash } from "node:crypto";
 import { nep413SigningHash, signHash, type AccessView, type U128String, type Voucher, type VoucherSecretKey } from "@x207/core";
 import { DailyRent, type DailyRentOptions } from "@x207/scheme";
@@ -38,19 +38,19 @@ export class RentLessee {
     return body;
   }
 
-  /** Keadaan akses menurut broker, dengan `paidUntil` dalam ms seperti yang dibaca SDK. */
+  /** Access state according to the broker, with `paidUntil` in ms as the SDK reads it. */
   async view(): Promise<RentView> {
     const body = await this.#json(await this.#fetch(`${this.#base}/grants/${this.#o.grantId}/access`));
     return { ...body, paidUntil: body.paidUntil === null ? 0 : Date.parse(body.paidUntil) };
   }
 
-  /** Tantangan bukti `grantee_ref` (BE-057), atau `null` bila broker tidak memintanya. */
+  /** The `grantee_ref` proof challenge (BE-057), or `null` if the broker does not request it. */
   async challenge(): Promise<{ circle: string; grantId: number; granteeRef: string; nonce: string; challenge: string } | null> {
     const body = await this.#json(await this.#fetch(`${this.#base}/grants/${this.#o.grantId}/access/challenge`));
     return body.required ? body : null;
   }
 
-  /** Satu hari sewa: 402 untuk syaratnya, lalu voucher hari itu di header `PAYMENT-SIGNATURE`. `proof` hanya untuk hari pertama. */
+  /** One rental day: a 402 for its terms, then that day's voucher in the `PAYMENT-SIGNATURE` header. `proof` only for the first day. */
   async payDay(args: { day: string; epoch: number; state: { seq: number; cumulativeAmount: U128String }; proof?: string }): Promise<{ view: RentView; voucher: Voucher }> {
     const url = `${this.#base}/grants/${this.#o.grantId}/access`;
     const body = JSON.stringify({ grantee_ref: this.#o.granteeRef, ...(args.proof ? { proof: args.proof } : {}) });
@@ -67,13 +67,13 @@ export class RentLessee {
     return { view: { ...answer, paidUntil: Date.parse(answer.paidUntil) }, voucher };
   }
 
-  /** Hari berikutnya: dibayar hanya bila broker (dan pemeriksaan langsung ke penyedia, bila ada) mengatakan akses masih berjalan. */
+  /** Next day: paid only if the broker (and a direct check with the provider, if any) says the access is still running. */
   async payNextDay(args: { day: string; epoch: number; state: { seq: number; cumulativeAmount: U128String }; directCheck?: () => Promise<boolean> }) {
     await this.daily.checkBeforeNextDay(await this.view(), args.directCheck);
     return this.payDay(args);
   }
 
-  /** Penyewa berhenti sewa: notice bertanda tangan ke broker, dan tidak ada voucher lagi. */
+  /** The renter stops renting: a signed notice to the broker, and no more vouchers. */
   async stop(at: number): Promise<RentView> {
     const notice = { circle: this.#o.circle, grant_id: this.#o.grantId, actor: this.#o.payer, action: "stop", at };
     const text = JSON.stringify(notice);

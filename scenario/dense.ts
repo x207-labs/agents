@@ -1,10 +1,10 @@
-// Skenario dasar (AG-009): lingkaran tertutup padat enam agent. Tiap agent membeli dari dua agent berikutnya di
-// cincin, jadi ada siklus melewati keenam agent. Rencana pembayaran deterministik untuk seed yang sama.
+// Base scenario (AG-009): a dense closed circle of six agents. Each agent buys from the next two agents in the
+// ring, so there is a cycle through all six agents. The payment plan is deterministic for the same seed.
 import { AGENT_NAMES, type AgentName } from "../shared/registry.ts";
 
 export type Payment = { buyer: AgentName; seller: AgentName };
 
-/** PRNG kecil dan deterministik (mulberry32). */
+/** Small deterministic PRNG (mulberry32). */
 export function prng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -16,14 +16,14 @@ export function prng(seed: number): () => number {
   };
 }
 
-/** Edge beli: tiap agent ke dua agent berikutnya di cincin (12 edge, termasuk cincin enam edge). */
+/** Buy edges: each agent to the next two agents in the ring (12 edges, including the six-edge ring). */
 export function denseEdges(): Payment[] {
   return AGENT_NAMES.flatMap((buyer, i) =>
     [1, 2].map((step) => ({ buyer, seller: AGENT_NAMES[(i + step) % AGENT_NAMES.length]! })),
   );
 }
 
-/** `count` pembayaran: setiap edge sekali lebih dulu, sisanya diacak dari edge yang sama menurut seed. */
+/** `count` payments: every edge once first, the rest shuffled from the same edges by seed. */
 export function planDensePayments(count: number, seed: number): Payment[] {
   const edges = denseEdges();
   if (count < edges.length) throw new Error(`count must be at least ${edges.length} so that every edge is used`);
@@ -32,7 +32,7 @@ export function planDensePayments(count: number, seed: number): Payment[] {
   return [...edges, ...extra];
 }
 
-/** Ada siklus sederhana melewati semua simpul `nodes` pada edge berarah `edges`. */
+/** There is a simple cycle through all nodes `nodes` on the directed edges `edges`. */
 export function hasCycleThroughAll(nodes: readonly string[], edges: ReadonlyArray<{ debtor: string; creditor: string }>): boolean {
   const next = new Map<string, string[]>();
   for (const e of edges) next.set(e.debtor, [...(next.get(e.debtor) ?? []), e.creditor]);

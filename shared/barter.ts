@@ -1,6 +1,6 @@
-// Barter dan marketplace untuk agent (AG-012, F5/F9): klien buku backend (M11), pengiriman intent offer/need, evaluasi usulan bundle
-// terhadap intent sendiri, dan tanda tangan `terms_hash` dengan kunci voucher. Hanya paket publik @x207/core yang dipakai (AG-006);
-// agent tidak pernah mengirim transaksi, jadi argumen `post_intent` dikembalikan ke pemanggil yang memegang pengirim transaksi.
+// Barter and marketplace for agents (AG-012, F5/F9): backend book client (M11), sending offer/need intents, evaluating bundle proposals
+// against the agent's own intents, and signing `terms_hash` with the voucher key. Only the public @x207/core package is used (AG-006);
+// the agent never sends transactions, so the `post_intent` arguments are returned to the caller that holds the transaction sender.
 import {
   bundleParticipants, intentHash, intentHashBase58, signBundle, signIntent, termsHash,
   type BarterIntent, type BarterSide, type BundleSignature, type BundleTerms, type Listing, type Offer, type Referral,
@@ -22,9 +22,9 @@ export class BookError extends Error {
 }
 
 export type BookOptions = {
-  /** Contoh `http://127.0.0.1:8787`. */
+  /** Example `http://127.0.0.1:8787`. */
   baseUrl: string;
-  /** Id lingkaran di path, mis. `agents-main`. */
+  /** Circle id in the path, e.g. `agents-main`. */
   circleId: string;
   fetch?: typeof fetch;
 };
@@ -113,7 +113,7 @@ export type ReferralView = {
 
 export type EpochSummary = { epoch: number; phase: string };
 
-/** Klien tipis atas read API dan buku marketplace; satu instance per lingkaran. */
+/** Thin client over the read API and the marketplace book; one instance per circle. */
 export class BookClient {
   readonly #base: string;
   readonly #fetch: typeof fetch;
@@ -166,7 +166,7 @@ export class BookClient {
   async offersOf(listingHash: string): Promise<OfferView[]> {
     return (await this.get<{ items: OfferView[] }>(`/listings/${listingHash}/offers`)).items;
   }
-  /** Kotak masuk: penawaran yang menunggu jawaban `account`. */
+  /** Inbox: offers waiting for an answer from `account`. */
   async inbox(account: string): Promise<OfferView[]> {
     return (await this.get<{ items: OfferView[] }>(`/offers?account=${encodeURIComponent(account)}&box=inbox`)).items;
   }
@@ -175,14 +175,14 @@ export class BookClient {
       offer, signature, ...(inReplyTo ? { inReplyTo } : {}), ...(referralHash ? { referralHash } : {}),
     });
   }
-  /** Usulan bundle dari solver tanpa kecocokan listing (SV-011): server menghitung ulang `terms_hash` dan memeriksa epoch open. */
+  /** Bundle proposals from the solver with no listing match (SV-011): the server recomputes `terms_hash` and checks that the epoch is open. */
   postBundleProposal(terms: BundleTerms): Promise<BundleProposalView> {
     return this.post<BundleProposalView>("/bundle-proposals", { terms, termsHash: termsHash(terms) });
   }
   postReferral(referral: Referral, signature: string): Promise<ReferralView> {
     return this.post<ReferralView>("/referrals", { referral, signature });
   }
-  /** Kotak masuk ajakan pencari yang masih pending untuk `account`. */
+  /** Inbox of seeker referrals still pending for `account`. */
   async referralInbox(account: string): Promise<ReferralView[]> {
     return (await this.get<{ items: ReferralView[] }>(`/referrals?account=${encodeURIComponent(account)}&box=inbox`)).items;
   }
@@ -195,7 +195,7 @@ export class BookClient {
   accept(listingHash: string, offerHash: string, body: { account: string; signature?: string; epoch?: number; searcher?: string; searcherShareBps?: number }): Promise<AcceptResult> {
     return this.post<AcceptResult>(`/listings/${listingHash}/offers/${offerHash}/accept`, body);
   }
-  /** Epoch `open` saat ini, atau `null` bila tidak ada. */
+  /** The current `open` epoch, or `null` if there is none. */
   async openEpoch(): Promise<number | null> {
     const epochs = (await this.get<{ items: EpochSummary[] }>("/epochs")).items;
     return epochs.find((e) => e.phase === "open")?.epoch ?? null;
@@ -209,9 +209,9 @@ export type Evaluation =
 const sum = (values: Iterable<string>): bigint => [...values].reduce((total, v) => total + BigInt(v), 0n);
 
 /**
- * Apakah usulan bundle cocok dengan salah satu intent terbuka milik `account`? Aturan: hash dihitung ulang dari syarat, lingkaran dan epoch
- * sama, `account` ikut serta, jumlah yang diterima sebagai payee minimal `offer.value` dan jumlah yang dibayar sebagai payer paling banyak
- * `need.value`. Intent yang sudah kedaluwarsa tidak dipakai. Mengembalikan alasan penolakan dari intent yang paling dekat cocok.
+ * Does a bundle proposal match one of the open intents owned by `account`? Rules: the hash is recomputed from the terms, the circle and epoch are the
+ * same, `account` takes part, the amount received as payee is at least `offer.value` and the amount paid as payer is at most
+ * `need.value`. Expired intents are not used. Returns the rejection reason from the closest matching intent.
  */
 export function evaluateProposal(args: {
   account: string;
@@ -219,7 +219,7 @@ export function evaluateProposal(args: {
   intents: readonly BarterIntent[];
   /** Detik unix. */
   now: number;
-  /** Epoch `open` saat ini bila diketahui; tanpa ini epoch tidak diperiksa. */
+  /** The current `open` epoch if known; without it the epoch is not checked. */
   openEpoch?: number | null;
 }): Evaluation {
   const { account, proposal, intents } = args;
@@ -248,13 +248,13 @@ export type ProposalAnswer = { termsHash: string; action: "signed" | "rejected";
 export type BarterAgentOptions = {
   identity: AgentIdentity;
   book: BookClient;
-  /** Akun kontrak lingkaran (penerima NEP-413), mis. `x207-circle.near`. */
+  /** Circle contract account (NEP-413 recipient), e.g. `x207-circle.near`. */
   contractId: string;
-  /** Detik unix; bisa diganti di test. */
+  /** Unix seconds; can be replaced in tests. */
   now?: () => number;
 };
 
-/** Agent yang memasang intent offer/need dan menandatangani usulan bundle yang cocok dengan intent-nya. */
+/** An agent that places offer/need intents and signs the bundle proposals that match its intents. */
 export class BarterAgent {
   readonly identity: AgentIdentity;
   readonly book: BookClient;
@@ -273,7 +273,7 @@ export class BarterAgent {
     return [...this.#intents.values()];
   }
 
-  /** Tandatangani dan kirim intent `offer` (yang agent sediakan) dan `need` (yang dibutuhkan); `ttlSeconds` default 1 jam. */
+  /** Sign and send an `offer` intent (what the agent provides) and a `need` intent (what it requires); `ttlSeconds` defaults to 1 hour. */
   async postIntent(offer: BarterSide, need: BarterSide, ttlSeconds = 3600): Promise<{ intent: BarterIntent; view: IntentView }> {
     const intent: BarterIntent = {
       circle: this.#contractId,
@@ -288,20 +288,20 @@ export class BarterAgent {
     return { intent, view };
   }
 
-  /** Argumen `post_intent` untuk intent yang sudah dikirim; pemegang transaksi mengirimnya. */
+  /** The `post_intent` arguments for an intent that was already sent; the transaction holder submits them. */
   postIntentArgs(intent: BarterIntent): { intent_hash: string } {
     return { intent_hash: intentHashBase58(intent) };
   }
 
-  /** Nilai evaluasi satu usulan terhadap intent sendiri, tanpa menandatangani. */
+  /** Evaluate one proposal against the agent's own intents, without signing. */
   async evaluate(proposal: BundleProposalView): Promise<Evaluation> {
     const openEpoch = await this.book.openEpoch();
     return evaluateProposal({ account: this.identity.accountId, proposal, intents: this.intents, now: this.#now(), openEpoch });
   }
 
   /**
-   * Permintaan tanda tangan dari solver (SV-011): syarat bundle datang langsung, bukan lewat buku. Agent menandatangani `terms_hash`
-   * hanya bila syaratnya cocok dengan intent terbukanya (aturan sama dengan `answerProposals`); selain itu `null`.
+   * Signature request from the solver (SV-011): the bundle terms arrive directly, not through the book. The agent signs `terms_hash`
+   * only if the terms match its open intent (same rules as `answerProposals`); otherwise `null`.
    */
   async signTerms(terms: BundleTerms): Promise<BundleSignature | null> {
     const openEpoch = await this.book.openEpoch();
@@ -311,7 +311,7 @@ export class BarterAgent {
     return verdict.ok ? signBundle(terms, this.identity.accountId, this.identity.voucherSecretKey) : null;
   }
 
-  /** Ambil usulan yang menunggu tanda tangan agent ini; tandatangani yang cocok dengan intent, tolak sisanya. */
+  /** Fetch the proposals waiting for this agent's signature; sign those that match an intent, reject the rest. */
   async answerProposals(): Promise<ProposalAnswer[]> {
     const account = this.identity.accountId;
     const answers: ProposalAnswer[] = [];

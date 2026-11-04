@@ -1,5 +1,5 @@
-// AG-005 di near-sandbox: enam agent dalam cincin saling membeli dan menjual lewat x207, kontrak nyata.
-// Jalankan dengan X207_SANDBOX=1 (npm run test:sandbox); harness di sdk/test-support.
+// AG-005 on near-sandbox: six agents in a ring buy from and sell to each other through x207, real contract.
+// Run with X207_SANDBOX=1 (npm run test:sandbox); harness in sdk/test-support.
 import { mkdtempSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -50,7 +50,7 @@ describe.skipIf(!sandboxAvailable)("AG-005 six-agent ring on near-sandbox", () =
     });
     const identity = Object.fromEntries(outcomes.map((o, i) => [AGENT_NAMES[i], o.identity])) as Record<AgentName, (typeof outcomes)[number]["identity"]>;
 
-    // Facilitator nyata di atas kontrak sandbox; respons /settle direkam untuk TC-AG-005-09.
+    // Real facilitator on top of the sandbox contract; the /settle responses are recorded for TC-AG-005-09.
     const relayer = await fx.sandbox.createAccount("relayer", "20");
     const pending = new PendingStore(":memory:");
     const rpc = new NearRpc({ urls: [fx.sandbox.rpcUrl], timeoutMs: 30_000 });
@@ -74,7 +74,7 @@ describe.skipIf(!sandboxAvailable)("AG-005 six-agent ring on near-sandbox", () =
       urls[name] = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     }
 
-    // TC-AG-005-01: tanpa header pembayaran -> 402 dengan dua entri
+    // TC-AG-005-01: no payment header -> 402 with two entries
     const challenge = await fetch(`${urls.summarizer}/api/summarize?input=hello`);
     expect(challenge.status).toBe(402);
     const required = decode(challenge.headers.get("PAYMENT-REQUIRED"));
@@ -82,7 +82,7 @@ describe.skipIf(!sandboxAvailable)("AG-005 six-agent ring on near-sandbox", () =
       "batch-settlement@x207:agents-main", "exact@near:mainnet",
     ]);
 
-    // TC-AG-005-02..08: tiap agent membeli dari agent berikutnya di cincin
+    // TC-AG-005-02..08: each agent buys from the next agent in the ring
     const ring = AGENT_NAMES.map((name, i) => [name, AGENT_NAMES[(i + 1) % AGENT_NAMES.length]!] as const);
     for (const [buyer, seller] of ring) {
       const paid = createAgentBuyer(identity[buyer], { rpcUrls: [fx.sandbox.rpcUrl] });
@@ -91,12 +91,12 @@ describe.skipIf(!sandboxAvailable)("AG-005 six-agent ring on near-sandbox", () =
       expect(await response.json()).toMatchObject({ agent: seller });
       const header = decode(response.headers.get("PAYMENT-RESPONSE"));
       expect(header).toMatchObject({ success: true, extensions: { x207: { seq: 1 } } });
-      // TC-AG-005-09: header penjual identik dengan respons /settle facilitator untuk panggilan itu
+      // TC-AG-005-09: the seller header is identical to the facilitator /settle response for that call
       expect(header).toEqual(settled.at(-1));
     }
     expect(settled).toHaveLength(6);
 
-    // Registrasi on-chain lalu graf kewajiban: enam edge cincin
+    // On-chain registration then the obligation graph: six ring edges
     const scheduler = new RegistrationScheduler({
       circleContract: fx.circle.accountId, store: pending, log: () => {}, registerThreshold: 1n,
       chain: new NearRegistrationChain({ rpc, circleContract: fx.circle.accountId, relayer: { accountId: relayer.accountId, privateKey: relayer.secretKey } }),
@@ -110,7 +110,7 @@ describe.skipIf(!sandboxAvailable)("AG-005 six-agent ring on near-sandbox", () =
       expect(edge.cumulative, `${buyer} -> ${seller}`).toBe("20000");
     }
 
-    // TC-AG-005-11: non-anggota membayar dengan voucher x207 -> 402 member_not_found, entri exact tetap diiklankan
+    // TC-AG-005-11: a non-member pays with an x207 voucher -> 402 member_not_found, the exact entry is still advertised
     const outsider = await fx.member("outsider");
     const keys = generateVoucherKeypair();
     const client = new X207PaymentClient({ payer: outsider.accountId, secretKey: keys.secretKey, headroom: async () => "1000000" });

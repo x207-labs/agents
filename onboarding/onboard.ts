@@ -1,11 +1,11 @@
-// Onboarding agent (AG-004, F1): satu kunci voucher ed25519 per agent, lalu `join` dan stake lewat
-// `onboardMember` dari @x207/core, ditandatangani kunci pemilik akun (bukan kunci voucher).
+// Agent onboarding (AG-004, F1): one ed25519 voucher key per agent, then `join` and stake through
+// `onboardMember` from @x207/core, signed by the account owner's key (not the voucher key).
 import { onboardMember, voucherPublicKey, type CircleViewFn, type ContractCall } from "@x207/core";
 import { loadIdentity, saveIdentity, type AgentIdentity, type SpendPolicy } from "../shared/identity.ts";
 
 export type AgentTarget = {
   accountId: string;
-  /** Mengirim transaksi dari akun agent, ditandatangani kunci pemilik akun itu. */
+  /** Sends a transaction from the agent account, signed by that account owner's key. */
   sendCall: (call: ContractCall) => Promise<unknown>;
 };
 
@@ -13,9 +13,9 @@ export type OnboardOptions = {
   agents: readonly AgentTarget[];
   circleContract: string;
   circleId: string;
-  /** sha256 hex huruf kecil dari syarat lingkaran yang disetujui pemilik. */
+  /** Lowercase sha256 hex of the circle terms approved by the owner. */
   termsHash: string;
-  /** Stake per agent dalam satuan terkecil USDT. */
+  /** Stake per agent in USDT smallest units. */
   stakeAmount: string;
   policy: SpendPolicy;
   view: CircleViewFn;
@@ -29,7 +29,7 @@ export type OnboardOptions = {
 
 export type OnboardOutcome = { identity: AgentIdentity; status: "onboarded" | "already_active" };
 
-/** Idempoten: agent yang sudah `active` dilewati dan identitasnya dipakai ulang. */
+/** Idempotent: an agent that is already `active` is skipped and its identity is reused. */
 export async function onboardAgents(options: OnboardOptions): Promise<OnboardOutcome[]> {
   const log = options.log ?? (() => {});
   const outcomes: OnboardOutcome[] = [];

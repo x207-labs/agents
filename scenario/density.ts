@@ -1,12 +1,12 @@
-// Variasi kepadatan graf (AG-010): tingkat rendah (cincin), sedang (cincin + loncat dua), tinggi (graf lengkap), dan
-// graf bintang tanpa siklus. Pembayaran deterministik menurut seed; ringkasan dihitung dari snapshot dan proposal kliring.
+// Graph density variations (AG-010): low (ring), medium (ring + two-step jump), high (complete graph), and
+// a star graph with no cycle. Payments are deterministic by seed; the summary is computed from the snapshot and the clearing proposal.
 import { AGENT_NAMES, type AgentName } from "../shared/registry.ts";
 import { prng, type Payment } from "./dense.ts";
 
 export type Density = "low" | "medium" | "high" | "star";
 export const DENSITIES: readonly Density[] = ["low", "medium", "high", "star"];
 
-/** Edge beli untuk satu tingkat. Bintang: lima agent membeli dari `gpu`, tanpa arah balik. */
+/** Buy edges for one level. Star: five agents buy from `gpu`, with no edge back. */
 export function edgesFor(level: Density): Payment[] {
   const names = AGENT_NAMES;
   switch (level) {
@@ -21,7 +21,7 @@ export function edgesFor(level: Density): Payment[] {
   }
 }
 
-/** `count` pembayaran: tiap edge sekali, sisanya acak dari edge tingkat itu menurut seed. */
+/** `count` payments: each edge once, the rest random from that level's edges by seed. */
 export function planDensity(level: Density, count: number, seed: number): Payment[] {
   const edges = edgesFor(level);
   if (count < edges.length) throw new Error(`count must be at least ${edges.length} for level ${level}`);
@@ -34,7 +34,7 @@ export type Summary = { clearedRatio: number | null; density: number | null; par
 
 const ratio4 = (a: bigint, b: bigint): number | null => (b === 0n ? null : Number((a * 20_000n + b) / (2n * b)) / 10_000);
 
-/** Ringkasan sama dengan metrik backend: cleared ÷ total kewajiban dan kepadatan graf. */
+/** Summary same as the backend metric: cleared ÷ total obligations and graph density. */
 export function summarize(edges: readonly SnapshotEdge[], clearedTotal: bigint): Summary {
   const nodes = new Set(edges.flatMap((e) => [e.debtor, e.creditor]));
   const total = edges.reduce((sum, e) => sum + BigInt(e.amount), 0n);

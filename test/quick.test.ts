@@ -24,10 +24,10 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-018 quick barter and the seeker", () => 
       { to: acct("scraper"), mode: "barter", listingValue: C(100) },
       { to: acct("summarizer"), mode: "pay", listingValue: C(100) },
     ]);
-    // agent yang tidak opt-in tidak pernah dikunjungi
+    // an agent that did not opt in is never visited
     expect(report.skipped).toEqual([acct("gpu")]);
 
-    // jalur bayar
+    // pay path
     expect(report.pay).toMatchObject({ counterpartyPays: C(93), status: "ready" });
     expect(report.pay!.legs.map((l) => [l.to.split(".")[0], l.amount]).sort()).toEqual([["cleaner", C(3)], ["translator", C(90)]]);
     // jalur barter
@@ -59,7 +59,7 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-018 quick barter and the seeker", () => 
     const limited = bot();
     limited.record(acct("summarizer"), NOW - 60);
     expect(limited.plan(listings, [agent()], NOW)).toEqual([]);
-    expect(limited.plan(listings, [agent()], NOW + 3600)).toHaveLength(1); // periode berikutnya
+    expect(limited.plan(listings, [agent()], NOW + 3600)).toHaveLength(1); // next period
     const refusing = bot();
     refusing.refuse(acct("summarizer"), "a".repeat(64));
     expect(refusing.plan(listings, [agent()], NOW).map((p) => p.listing.listingHash)).toEqual(["b".repeat(64)]);

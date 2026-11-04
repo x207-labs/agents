@@ -1,28 +1,28 @@
-// Transaksi pemberi dan penyewa untuk skenario kelas B (AG-015): `offer_grant` oleh pemberi dan `accept_grant` oleh penyewa, ditandatangani akun
-// pemilik masing-masing lewat `send` yang disuntik (seperti onboarding). Tanpa dana terlampir: kedua method gratis. Modul ini di folder onboarding karena
-// folder scenario tidak boleh mengirim transaksi (AG-007).
+// Grantor and renter transactions for the class B scenario (AG-015): `offer_grant` by the grantor and `accept_grant` by the renter, signed by each
+// owner's account through the injected `send` (like onboarding). No attached funds: both methods are free. This module is in the onboarding folder because
+// the scenario folder must not send transactions (AG-007).
 import type { ContractCall } from "@x207/core";
 import { CLASS_B_ASSET_TYPE, newAccessKey, type AccessKey } from "../scenario/classb.ts";
 
-/** Mengirim satu panggilan kontrak dari akun seorang anggota (pemberi atau penyewa) dan mengembalikan nilai suksesnya. */
+/** Sends one contract call from a member's account (grantor or renter) and returns its success value. */
 export type SendCall = (call: ContractCall) => Promise<unknown>;
 
 export const CLASS_B_DELIVERY = "near_access_key";
 
 export type OfferRental = {
-  /** Akun pemberi mengirim `offer_grant`. */
+  /** The grantor account sends `offer_grant`. */
   send: SendCall;
   contract: string;
   scope: string;
-  /** Credit satuan terkecil per hari. */
+  /** Credit smallest units per day. */
   unitPrice: string;
-  /** Akun broker yang menyerahkan key (`operator` grant). */
+  /** Broker account that hands over the key (`operator` of the grant). */
   operator: string;
-  /** Batas akhir grant, milidetik Unix. */
+  /** Grant deadline, Unix milliseconds. */
   expiresAtMs: number;
 };
 
-/** Pemberi menawarkan sewa harian; mengembalikan `grant_id`. */
+/** The grantor offers a daily rental; returns `grant_id`. */
 export async function offerRental(o: OfferRental): Promise<number> {
   const id = await o.send({
     receiverId: o.contract, methodName: "offer_grant", deposit: 0n,
@@ -37,7 +37,7 @@ export async function offerRental(o: OfferRental): Promise<number> {
   return Number(id);
 }
 
-/** Penyewa menerima grant dengan kunci function-call miliknya sendiri sebagai `delivery_pubkey`; kunci rahasia tetap di penyewa. */
+/** The renter accepts the grant with its own function-call key as `delivery_pubkey`; the secret key stays with the renter. */
 export async function acceptRental(o: { send: SendCall; contract: string; grantId: number; key?: AccessKey }): Promise<AccessKey> {
   const key = o.key ?? newAccessKey();
   await o.send({ receiverId: o.contract, methodName: "accept_grant", args: { grant_id: o.grantId, delivery_pubkey: key.publicKey }, deposit: 0n });

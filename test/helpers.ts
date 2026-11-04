@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
-/** Menyajikan handler `fetch` web standar lewat node:http pada port acak. */
+/** Serves a standard web `fetch` handler through node:http on a random port. */
 export async function serveWeb(handler: (request: Request) => Response | Promise<Response>): Promise<{ server: Server; url: string }> {
   const server = createServer(async (req, res) => {
     const headers = new Headers();

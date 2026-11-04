@@ -1,6 +1,6 @@
-// Agen yang memesan dan mengerjakan jasa (AG-026, pipeline P6, ADR-45) dengan format SDK (SD-069): pesanan bertanda tangan dua pihak, tonggak dengan kiriman, konfirmasi atau
-// sengketa di jendela, hasil per lead, dan bayar per transaksi penyedia (keeper). Hanya paket publik (`@x207/core`) dan HTTP. Buku pesanan tidak membayar apa pun: pembeli
-// menandatangani voucher setelah tonggak terkonfirmasi (`milestoneVoucher`) atau per bukti on-chain (`payForProofs`), dan penjual mendaftarkannya.
+// Agent that orders and performs services (AG-026, pipeline P6, ADR-45) in the SDK format (SD-069): an order signed by both parties, milestones with deliveries, confirmation or
+// dispute in a window, results per lead, and pay per provider transaction (keeper). Only the public package (`@x207/core`) and HTTP. The order book does not pay anything: the buyer
+// signs a voucher after a milestone is confirmed (`milestoneVoucher`) or per on-chain proof (`payForProofs`), and the seller registers it.
 import { createHash } from "node:crypto";
 import {
   OrderLedger, nep413SigningHash, orderClaimNotice, orderHash, serializeOrder, signHash,
@@ -42,7 +42,7 @@ export class OrderBook {
   get(hash: string): Promise<OrderState> {
     return this.call("GET", `/orders/${hash}`);
   }
-  /** Pesanan dibuka setelah KEDUA pihak menandatangani: tanda tangan pertama menyimpannya sebagai `proposed`, yang kedua membukanya. */
+  /** The order opens after BOTH parties sign: the first signature stores it as `proposed`, the second opens it. */
   async open(doc: OrderDocument, buyer: InvoiceActor, seller: InvoiceActor, mandate?: DelegateMandate): Promise<string> {
     // the signature is over serializeOrder(doc) itself: the same bytes the backend hashes; a delegate order also carries its mandate (SD-072)
     const sign = (a: InvoiceActor) => ({ account: a.account, signature: signRaw(this.contract, serializeOrder(doc), a) });
@@ -79,15 +79,15 @@ function signRaw(contract: string, json: string, actor: InvoiceActor): string {
   return signHash(nep413SigningHash(json, createHash("sha256").update(json).digest(), contract), actor.secretKey);
 }
 
-/** Buku bayar satu pesanan di sisi pembeli: ingat tonggak dan bukti yang sudah dibayar (tinjauan BE-062, F4 dan F5). */
+/** Pay book for one order on the buyer side: remembers the milestones and proofs already paid (BE-062 review, F4 and F5). */
 export const ledgerFor = (order: OrderDocument): OrderLedger => new OrderLedger(order);
 
-/** Pembeli membayar tonggak yang sudah terkonfirmasi: voucher dari keadaan pasangan yang sebenarnya, ditandatangani, siap didaftarkan penjual; tonggak yang sama dua kali ditolak buku. */
+/** The buyer pays a confirmed milestone: a voucher from the actual pair state, signed, ready for the seller to register; the same milestone twice is rejected by the book. */
 export function payMilestone(ledger: OrderLedger, index: number, epoch: number, state: InvoicePairState, buyer: InvoiceActor): Voucher {
   return ledger.payMilestone({ index, epoch, state, secretKey: buyer.secretKey });
 }
 
-/** Agent pembeli untuk jasa keeper atau solver: satu voucher per bukti yang cocok, tidak lewat anggaran, dan tidak dua kali. */
+/** Buyer agent for keeper or solver services: one voucher per matching proof, not through the budget, and never twice. */
 export function payProofs(ledger: OrderLedger, epoch: number, state: InvoicePairState, proofs: readonly OnchainProof[], buyer: InvoiceActor, mandate?: DelegateMandate) {
   return ledger.payProofs({ epoch, state, proofs, secretKey: buyer.secretKey, ...(mandate ? { mandate } : {}) });
 }

@@ -1,29 +1,29 @@
-// Skenario satu aset tiap kelas di kontrak (AG-022, F8). Berkas ini ada di `test/` karena yang dikirimnya adalah tindakan pemilik (titipan token, penerimaan grant),
-// di luar kebijakan agent AG-007 yang melarang folder `scenario/` mengirim transaksi berdeposit.
-// Isi: registri D10 sudah berisi katalog, lalu kelas A (token RWA tiruan dengan whitelist), B (kunci akses NEAR),
-// C (kunci API lewat proxy), dan D (jam GPU) masing-masing dibuat sebagai grant, dan satu aset kelas X ditolak. Hanya kontrak yang dipakai; broker, facilitator, dan
-// penyedia tiruan tidak ikut, jadi untuk B sampai D yang dibuktikan adalah penawaran dan penerimaan di D11, bukan pengiriman aksesnya (itu ada di test broker).
-// `assertBuyerRegisteredAtToken` (SD-060) tidak dipanggil di sini karena `probes/mock_rwa` belum punya view `storage_balance_of`; di token nyata helper itu dipakai sebelum membeli.
-// Kelas A diselesaikan sampai token berpindah: pembeli yang belum masuk whitelist gagal dan pembayarannya dibatalkan, setelah masuk whitelist berhasil.
+// Scenario with one asset per class in the contract (AG-022, F8). This file lives in `test/` because what it sends are owner actions (token deposit, grant acceptance),
+// outside the AG-007 agent policy that forbids the `scenario/` folder from sending transactions with a deposit.
+// Content: the D10 registry already holds the catalog, then class A (mock RWA token with a whitelist), B (NEAR access key),
+// C (API key through a proxy), and D (GPU hours) are each created as a grant, and one class X asset is rejected. Only the contract is used; the broker, facilitator, and
+// mock provider are not involved, so for B to D what is proven is the offer and acceptance in D11, not the delivery of the access (that is in the broker test).
+// `assertBuyerRegisteredAtToken` (SD-060) is not called here because `probes/mock_rwa` has no `storage_balance_of` view yet; on a real token that helper is used before buying.
+// Class A is settled until the token moves: a buyer not yet on the whitelist fails and the payment is cancelled; once whitelisted it succeeds.
 import { buildFtEscrowDepositCall, ftEscrowGrantScope, signVoucher, type AccountId, type ContractCall } from "@x207/core";
 
 
 export type SendResult = { failures: string[]; logs: string[]; value: unknown };
 export type ClassScenarioPorts = {
-  /** Kirim satu panggilan sebagai `account`; kegagalan dikembalikan, tidak dilempar. */
+  /** Send one call as `account`; a failure is returned, not thrown. */
   send(account: AccountId, call: ContractCall & { gas?: bigint }): Promise<SendResult>;
-  /** View di kontrak mana pun (kontrak lingkaran atau token). */
+  /** View on any contract (circle contract or token). */
   view(contractId: AccountId, methodName: string, args: object): Promise<unknown>;
 };
 export type ClassScenarioActors = {
   circle: AccountId;
-  /** Kontrak token RWA tiruan (`probes/mock_rwa`). */
+  /** Mock RWA token contract (`probes/mock_rwa`). */
   token: AccountId;
   grantor: AccountId;
   buyer: AccountId;
-  /** Kunci voucher pembeli (untuk `complete_escrow`). */
+  /** Buyer voucher key (for `complete_escrow`). */
   buyerVoucherKey: `ed25519:${string}`;
-  /** Kunci publik function-call key yang diminta penerima grant kelas B. */
+  /** Public key of the function-call key requested by the class B grant recipient. */
   deliveryPubkey: string;
   epoch: number;
 };
@@ -33,7 +33,7 @@ const DAY_NS = 86_400_000_000_000n;
 export const RWA_AMOUNT = "1000";
 export const RWA_PRICE = "10000000";
 
-/** Nama event NEP-297 dari baris log (`EVENT_JSON:{...}`); baris lain diabaikan. */
+/** NEP-297 event name from a log line (`EVENT_JSON:{...}`); other lines are ignored. */
 const eventsOf = (logs: string[]): string[] =>
   logs.flatMap((line) => {
     try {

@@ -1,6 +1,6 @@
-// Buku marketplace backend (M11) berjalan di dalam proses untuk test agent: database D9 dalam memori, anggota dengan kunci voucher agent,
-// satu epoch `open`, dan route marketplace asli. Dimuat lewat import dinamis supaya typecheck agents tidak mengikuti kode backend,
-// dan test dilewati bila repo backend tidak ada (CI agents berdiri sendiri).
+// Backend marketplace book (M11) running in-process for the agent tests: in-memory D9 database, members with agent voucher keys,
+// one `open` epoch, and the real marketplace routes. Loaded through dynamic import so the agents typecheck does not follow the backend code,
+// and the test is skipped if the backend repo is absent (agents CI is standalone).
 import { pathToFileURL } from "node:url";
 import { generateVoucherKeypair, type BundleTerms } from "@x207/core";
 import { BookClient } from "../shared/barter.ts";
@@ -13,13 +13,13 @@ const load = (path: string): Promise<any> => import(/* @vite-ignore */ pathToFil
 
 export type MarketBook = {
   book: BookClient;
-  /** URL dasar read API. */
+  /** Base URL of the read API. */
   url: string;
   identities: Record<string, AgentIdentity>;
   db: any;
-  /** Waktu server dalam ms; geser untuk menguji kedaluwarsa. */
+  /** Server time in ms; shift to test expiry. */
   clock: { now: number };
-  /** Stand-in keluaran solver (SV-010): simpan usulan bundle melingkar yang belum ditandatangani siapa pun. */
+  /** Stand-in for solver output (SV-010): store a circular bundle proposal that nobody has signed yet. */
   injectProposal(terms: BundleTerms): Promise<string>;
   setEpochPhase(phase: string): void;
   stop(): Promise<void>;

@@ -1,17 +1,17 @@
-// Skenario `business` (AG-020, K-59): agent pengadaan membeli jasa secara kredit tanpa persetujuan per transaksi, tetapi hanya dalam
-// batas yang pemilik tetapkan: daftar jasa (allowlist) dengan harga tertinggi per jasa, batas per panggilan, dan anggaran per epoch.
-// Pemeriksaan jalan sebelum pembayaran apa pun: harga dibaca dari tantangan 402 penjual, dan voucher baru ditandatangani hanya bila
-// semua batas lolos. Pembelian di luar batas ditolak tanpa voucher dan tanpa pertanyaan ke manusia.
+// `business` scenario (AG-020, K-59): a procurement agent buys services on credit without per-transaction approval, but only within
+// the limits the owner sets: a service list (allowlist) with a maximum price per service, a per-call limit, and a budget per epoch.
+// The check runs before any payment: the price is read from the seller's 402 challenge, and a new voucher is signed only if
+// all limits pass. A purchase outside the limits is rejected with no voucher and no question to a human.
 import type { SpendPolicy } from "../shared/identity.ts";
 
 export type ProcurementService = {
-  /** Nama jasa di daftar pemilik, mis. `translate`. */
+  /** Service name in the owner's list, e.g. `translate`. */
   name: string;
-  /** URL dasar agent penjual. */
+  /** Base URL of the selling agent. */
   url: string;
-  /** Rute berbayar, mis. `/api/translate`. */
+  /** Paid route, e.g. `/api/translate`. */
   path: string;
-  /** Harga tertinggi per panggilan untuk jasa ini, satuan terkecil credit. */
+  /** Maximum price per call for this service, credit smallest unit. */
   maxPrice: string;
 };
 
@@ -31,15 +31,15 @@ export type Purchase =
 export type ProcurementOptions = {
   account: string;
   policy: ProcurementPolicy;
-  /** `fetch` yang membayar 402 dengan voucher (createAgentBuyer). */
+  /** `fetch` that pays the 402 with a voucher (createAgentBuyer). */
   pay: typeof fetch;
-  /** `fetch` polos untuk membaca tantangan harga; default `fetch` global. */
+  /** Plain `fetch` to read the price challenge; defaults to the global `fetch`. */
   quote?: typeof fetch;
 };
 
 type Requirement = { scheme?: string; network?: string; amount?: string };
 
-/** Harga x207 dari tantangan 402: entri `batch-settlement` pada jaringan `x207:`; `null` bila tidak ada atau bukan 402. */
+/** x207 price from the 402 challenge: the `batch-settlement` entry on the `x207:` network; `null` if absent or not a 402. */
 export async function readQuote(response: Response): Promise<string | null> {
   if (response.status !== 402) return null;
   let accepts: Requirement[] | undefined;
@@ -69,12 +69,12 @@ export class ProcurementAgent {
     this.#quote = options.quote ?? fetch;
   }
 
-  /** Pengeluaran epoch berjalan, satuan terkecil credit. */
+  /** Spend in the current epoch, credit smallest unit. */
   get spent(): bigint {
     return this.#spent;
   }
 
-  /** Epoch baru: anggaran dimulai dari nol lagi. */
+  /** New epoch: the budget starts from zero again. */
   newEpoch(): void {
     this.#spent = 0n;
   }
@@ -85,7 +85,7 @@ export class ProcurementAgent {
     return result;
   }
 
-  /** Beli satu panggilan `service` dengan `input` bila lolos semua batas pemilik. */
+  /** Buy one `service` call with `input` if all owner limits pass. */
   async buy(service: string, input: string): Promise<Purchase> {
     const listed = this.policy.services.find((s) => s.name === service);
     if (!listed) return this.#deny(service, "service_not_allowed");
@@ -118,7 +118,7 @@ export type BusinessReport = {
   budget: string;
 };
 
-/** Jalankan daftar pembelian berurutan tanpa konfirmasi manusia dan ringkas hasilnya. */
+/** Run a list of purchases in sequence without human confirmation and summarize the result. */
 export async function runProcurement(agent: ProcurementAgent, requests: ReadonlyArray<{ service: string; input: string }>): Promise<BusinessReport> {
   const denied: BusinessReport["denied"] = [];
   let approved = 0;

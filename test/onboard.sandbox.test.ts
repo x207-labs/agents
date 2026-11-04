@@ -1,4 +1,4 @@
-// TC-AG-004-01..05 di near-sandbox, dijalankan dengan X207_SANDBOX=1 (harness di sdk/test-support).
+// TC-AG-004-01..05 on near-sandbox, run with X207_SANDBOX=1 (harness in sdk/test-support).
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -38,26 +38,26 @@ describe.skipIf(!sandboxAvailable)("AG-004 six agents on near-sandbox", () => {
       usdtTokenId: fx.usdt.accountId, pollIntervalMs: 200, timeoutMs: 30_000,
     });
 
-    // 01: enam pubkey berbeda
+    // 01: six distinct pubkeys
     const pubkeys = outcomes.map((o) => o.identity.voucherPublicKey);
     expect(new Set(pubkeys).size).toBe(6);
     for (const [i, { identity }] of outcomes.entries()) {
       const member = (await fx.sandbox.view<{ status: string; limit: string; stake: string; pubkey_voucher: string }>(
         fx.circle.accountId, "member", { account_id: identity.accountId },
       ))!;
-      // 02: active, limit > 0 dan <= stake
+      // 02: active, limit > 0 and <= stake
       expect(member.status).toBe("active");
       expect(BigInt(member.limit)).toBeGreaterThan(0n);
       expect(BigInt(member.limit)).toBeLessThanOrEqual(BigInt(member.stake));
-      // 03: pubkey di kontrak = pubkey kunci lokal
+      // 03: pubkey on the contract = pubkey of the local key
       expect(member.pubkey_voucher).toBe(pubkeys[i]);
-      // 04: pubkey voucher bukan access key akun
+      // 04: the voucher pubkey is not an account access key
       const keys = await fx.sandbox.provider.viewAccessKeyList({ accountId: identity.accountId });
       expect(keys.keys.map((k) => k.public_key)).not.toContain(pubkeys[i]);
-      // 06: kebijakan tersimpan dan terbaca ulang
+      // 06: the policy is stored and read back
       expect(loadIdentity(keysDir, "sandbox", identity.accountId)?.policy).toEqual({ maxPerCall: "100000", maxPerEpoch: "50000000" });
     }
-    // 05: join dan stake dikirim dari akun agent masing-masing
+    // 05: join and stake are sent from each agent's own account
     for (const { identity } of outcomes) {
       expect(signedBy.filter((s) => s.account === identity.accountId).map((s) => s.method)).toEqual(["join", "ft_transfer_call"]);
     }

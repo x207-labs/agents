@@ -1,4 +1,4 @@
-// Tumpukan lengkap di near-sandbox untuk test e2e agents: kontrak, enam agent ter-onboard, facilitator, dan enam server agent.
+// Full stack on near-sandbox for the agents e2e tests: contract, six onboarded agents, facilitator, and six agent servers.
 import { mkdtempSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -21,7 +21,7 @@ export type Stack = {
   identity: Record<AgentName, AgentIdentity>;
   urls: Record<AgentName, string>;
   pending: PendingStore;
-  /** Respons `/settle` facilitator, urut waktu. */
+  /** Facilitator `/settle` responses, in time order. */
   settled: unknown[];
   scheduler: RegistrationScheduler;
   facilitatorUrl: string;

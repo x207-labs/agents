@@ -1,6 +1,6 @@
-// Agen yang menjual dan membeli lisensi konten (AG-027, pipeline P7, ADR-46) dengan format SDK (SD-070): berkas dienkripsi, penjual memasang ciphertext di sumber mana saja, kunci
-// disegel ke pembeli, voucher pembeli ditahan buku sampai isi cocok, dan berkas yang salah dibuktikan dengan bukti curang. Hanya paket publik (`@x207/core`) dan HTTP; mendaftarkan
-// voucher ke kontrak dilakukan penjual setelah buku melepasnya, bukan urusan buku.
+// Agent that sells and buys content licenses (AG-027, pipeline P7, ADR-46) in the SDK format (SD-070): the file is encrypted, the seller places the ciphertext at any source, the key is
+// sealed to the buyer, the buyer's voucher is held by the book until the content matches, and a wrong file is proven with fraud proof. Only the public package (`@x207/core`) and HTTP; registering the
+// voucher with the contract is done by the seller after the book releases it, not by the book.
 import {
   contentHash, createRelease, deriveBoxKey, encryptContent, fetchCiphertext, licenseDocumentHash, licenseResource, listingHash, signListing, signVoucher, verifyDelivery,
   type CheatProof, type ContentRef, type ContentSource, type Listing, type LicenseDocument, type UnsignedVoucher, type VoucherSecretKey,
@@ -57,7 +57,7 @@ export class LicenseBook {
 
 export type Sold = { listing: Listing; listingHash: string; doc: LicenseDocument; docHash: string; plain: Uint8Array; ciphertext: Uint8Array; key: Uint8Array }
 
-/** Penjual menyiapkan lisensi: hash isi, enkripsi, dokumen lisensi, dan listing bertanda tangan dengan `detail` yang diminta buku. `claimedPlain` memungkinkan skenario penjual curang. */
+/** The seller prepares the license: content hash, encryption, license document, and signed listing with the `detail` the book requests. `claimedPlain` allows a cheating-seller scenario. */
 export async function listLicense(book: LicenseBook, seller: LicenseActor, o: {
   plain: Uint8Array; assetType: string; licenseId: string; exclusive?: boolean; nonce: string; price: string; expiresAt: number; claimedPlain?: Uint8Array
 }): Promise<Sold> {
@@ -78,7 +78,7 @@ export async function listLicense(book: LicenseBook, seller: LicenseActor, o: {
   return { listing, listingHash: listingHash(listing), doc, docHash, plain: o.plain, ciphertext, key };
 }
 
-/** Pembeli membayar dengan voucher yang ditahan buku: melanjutkan keadaan pasangan di epoch yang terbuka. */
+/** The buyer pays with a voucher that the book holds: continues the pair state in the open epoch. */
 export function buyLicense(book: LicenseBook, buyer: InvoiceActor, sold: Sold, epoch: number, state: { seq: number; cumulative: string }): Promise<PurchaseState> {
   const voucher: UnsignedVoucher = {
     circle: book.contract, payer: buyer.account, payee: sold.listing.account, epoch, seq: state.seq + 1,
@@ -87,7 +87,7 @@ export function buyLicense(book: LicenseBook, buyer: InvoiceActor, sold: Sold, e
   return book.purchase(sold.listingHash, voucher, buyer.secretKey);
 }
 
-/** Penjual mencatat ciphertext di sumber lalu melepas kunci yang disegel ke pembeli. */
+/** The seller records the ciphertext at the source then releases the sealed key to the buyer. */
 export async function serveLicense(book: LicenseBook, seller: LicenseActor, id: string, sold: Sold, source: ContentRef, buyer: LicenseActor): Promise<PurchaseState> {
   const posted = { circle: book.contract, purchase_id: id, actor: seller.account, action: "cipher_posted", at: book.at(), source, cipher_hash: contentHash(sold.ciphertext) };
   await book.notice(id, posted, signJsonNotice(book.contract, posted, seller.secretKey));
@@ -101,8 +101,8 @@ export async function serveLicense(book: LicenseBook, seller: LicenseActor, id: 
 export type Received = { outcome: "confirmed" | "disputed" | "refused"; content?: Uint8Array; status?: PurchaseState["status"]; reason?: string; proof?: CheatProof }
 
 /**
- * Pembeli mengunduh dari sumber, memeriksa `cipher_hash`, rilis, dan isi. Cocok: konfirmasi. Tidak cocok: sengketa dengan bukti curang tanpa ciphertext (buku mengunduhnya sendiri
- * dari sumber). Salah sumber atau tanda tangan bukan kecurangan penjual dan tidak menjadi bukti.
+ * The buyer downloads from the source and checks `cipher_hash`, the release, and the content. Match: confirm. No match: dispute with fraud proof without the ciphertext (the book downloads it itself
+ * from the source). A wrong source or signature is not seller fraud and is not proof.
  */
 export async function receiveLicense(book: LicenseBook, buyer: LicenseActor, id: string, sellerPublicKey: string, sources: Partial<Record<ContentRef["kind"], ContentSource>>): Promise<Received> {
   const view = await book.get(id);
@@ -130,7 +130,7 @@ export async function receiveLicense(book: LicenseBook, buyer: LicenseActor, id:
   return { outcome: "refused", reason: verdict.reason };
 }
 
-/** Pembeli nakal: menyengketakan berkas yang benar dengan bukti buatan sendiri (kunci kotaknya diserahkan, berkasnya benar). */
+/** Rogue buyer: disputes a correct file with self-made proof (the box key is handed over, the file is correct). */
 export async function falseDispute(book: LicenseBook, buyer: LicenseActor, id: string): Promise<PurchaseState> {
   const view = await book.get(id);
   const boxKey = Buffer.from(deriveBoxKey(Buffer.from(view.release.sealed_key, "hex"), buyer.secretKey as string)).toString("hex");

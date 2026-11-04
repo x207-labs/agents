@@ -1,21 +1,21 @@
-// Skenario `realworld` (AG-021, K-59; format SDK sejak AG-025): tiga bisnis saling punya invoice. Tiap invoice dicatat sebagai voucher kumulatif debitur ke
-// kreditur dengan `resource = x207:invoice:<sha256 invoice>` (hash invoice off-chain; isi invoice tidak masuk rantai). Kliring F3 menghapus
-// utang melingkar dan selisihnya masuk jalur residual F4. Tidak ada kontrak baru: hanya voucher dan kliring yang sudah ada.
+// `realworld` scenario (AG-021, K-59; SDK format since AG-025): three businesses owe each other invoices. Each invoice is recorded as a cumulative voucher from the debtor to the
+// creditor with `resource = x207:invoice:<sha256 invoice>` (the invoice hash is off-chain; the invoice content never goes on-chain). F3 clearing removes
+// circular debt and the difference goes to the F4 residual path. No new contract: only the existing vouchers and clearing.
 import { invoiceHash as sdkInvoiceHash, invoiceResource as sdkInvoiceResource, signVoucher, type InvoiceDocument, type Voucher } from "@x207/core";
 
 const CREDIT = 1_000_000n;
 export const credit = (n: number | bigint): string => (BigInt(n) * CREDIT).toString();
 
-/** Invoice: `issuer` menagih `debtor` sebesar `amount` (satuan terkecil credit) untuk `memo`. Sama dengan dokumen invoice SDK (SD-065). */
+/** Invoice: `issuer` bills `debtor` for `amount` (credit smallest unit) for `memo`. Same as the SDK invoice document (SD-065). */
 export type Invoice = InvoiceDocument;
 
-/** Hash invoice menurut SDK: sha256 atas JSON kanonik `{id, issuer, debtor, amount, memo}`; heks huruf kecil 64 karakter. */
+/** Invoice hash per the SDK: sha256 over the canonical JSON `{id, issuer, debtor, amount, memo}`; 64 lowercase hex characters. */
 export const invoiceHash = (invoice: Invoice): string => sdkInvoiceHash(invoice);
 
-/** `resource` voucher invoice: `x207:invoice:<hash>` (format SDK; skenario AG-021 lama memakai `invoice:<hash>`). */
+/** Invoice voucher `resource`: `x207:invoice:<hash>` (SDK format; the old AG-021 scenario used `invoice:<hash>`). */
 export const invoiceResource = (invoice: Invoice): string => sdkInvoiceResource(sdkInvoiceHash(invoice));
 
-/** Tiga bisnis: pemasok (supplier), pabrik (maker), pengecer (retailer). Utang melingkar maker -> supplier -> retailer -> maker. */
+/** Three businesses: supplier, maker, retailer. Circular debt maker -> supplier -> retailer -> maker. */
 export type Businesses = { supplier: string; maker: string; retailer: string };
 
 export function sampleInvoices(b: Businesses): Invoice[] {
@@ -29,8 +29,8 @@ export function sampleInvoices(b: Businesses): Invoice[] {
 export type InvoiceVoucher = { invoice: Invoice; hash: string; voucher: Omit<Voucher, "signature">; signature: Voucher["signature"] };
 
 /**
- * Satu voucher kumulatif per invoice, ditandatangani debitur. Invoice untuk pasangan (debitur, kreditur) yang sama menaikkan `seq`
- * dan `cumulativeAmount`; yang didaftarkan ke kontrak adalah voucher terakhir tiap pasangan.
+ * One cumulative voucher per invoice, signed by the debtor. Invoices for the same (debtor, creditor) pair raise `seq`
+ * and `cumulativeAmount`; what gets registered with the contract is the last voucher of each pair.
  */
 export function buildInvoiceVouchers(args: {
   circle: string;
@@ -57,7 +57,7 @@ export function buildInvoiceVouchers(args: {
   });
 }
 
-/** Voucher terakhir tiap pasangan (debitur, kreditur), urutan pertama kemunculan; itulah yang didaftarkan on-chain. */
+/** The last voucher of each (debtor, creditor) pair, in order of first appearance; that is what gets registered on-chain. */
 export function latestPerPair(vouchers: readonly InvoiceVoucher[]): InvoiceVoucher[] {
   const latest = new Map<string, InvoiceVoucher>();
   for (const v of vouchers) latest.set(`${v.voucher.payer}>${v.voucher.payee}`, v);
@@ -67,21 +67,21 @@ export function latestPerPair(vouchers: readonly InvoiceVoucher[]): InvoiceVouch
 export type Edge = { debtor: string; creditor: string; amount: bigint };
 
 export type Netting = {
-  /** Total semua utang sebelum kliring. */
+  /** Total of all debt before clearing. */
   before: bigint;
-  /** Total yang dihapus kliring (jumlah di semua edge siklus). */
+  /** Total removed by clearing (the sum over all edges of the cycles). */
   cleared: bigint;
-  /** Total yang tersisa setelah kliring. */
+  /** Total remaining after clearing. */
   after: bigint;
-  /** Edge sisa setelah kliring; inilah yang masuk jalur residual F4. */
+  /** Edges left after clearing; these enter the F4 residual path. */
   residual: Edge[];
-  /** Posisi bersih tiap akun: piutang − utang; tidak berubah oleh kliring. */
+  /** Net position of each account: receivable − debt; unchanged by clearing. */
   net: Record<string, bigint>;
-  /** Total yang benar-benar berpindah lewat jalur residual F4: jumlah posisi bersih positif (= jumlah negatif). */
+  /** Total that actually moves through the F4 residual path: the sum of positive net positions (= the sum of negative ones). */
   settlement: bigint;
 };
 
-/** Edge utang dari invoice, digabung per pasangan (debitur, kreditur). */
+/** Debt edges from the invoices, merged per (debtor, creditor) pair. */
 export function edgesOf(invoices: readonly Invoice[]): Edge[] {
   const merged = new Map<string, Edge>();
   for (const i of invoices) {
@@ -94,9 +94,9 @@ export function edgesOf(invoices: readonly Invoice[]): Edge[] {
 }
 
 /**
- * Pembatalan siklus berulang: cari siklus, kurangi semua edge di siklus dengan edge terkecilnya, ulangi sampai graf tanpa siklus.
- * Untuk cincin tunggal hasilnya persis kliring kontrak (jumlah siklus = edge terkecil); graf dengan banyak siklus yang saling
- * tumpang tindih bisa punya lebih dari satu hasil, jadi angka akhir yang dipakai tetap posisi dari kontrak (lihat tes sandbox).
+ * Repeated cycle cancellation: find a cycle, reduce every edge in the cycle by its smallest edge, repeat until the graph has no cycle.
+ * For a single ring the result is exactly the contract clearing (cycle amount = smallest edge); a graph with many overlapping
+ * cycles can have more than one result, so the final figures used are still the positions from the contract (see the sandbox test).
  */
 export function netInvoices(invoices: readonly Invoice[]): Netting {
   const edges = edgesOf(invoices).map((e) => ({ ...e }));
@@ -138,7 +138,7 @@ export function netInvoices(invoices: readonly Invoice[]): Netting {
   return { before, cleared, after: before - cleared, residual, net, settlement };
 }
 
-/** Baris laporan yang dicetak skenario: total sebelum dan sesudah netting dalam credit utuh. */
+/** Report lines printed by the scenario: totals before and after netting in whole credits. */
 export function formatNetting(n: Netting): string[] {
   const fmt = (v: bigint) => (Number(v) / Number(CREDIT)).toString();
   return [

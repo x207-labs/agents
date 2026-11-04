@@ -1,4 +1,4 @@
-// TC-AG-009-01..03 di near-sandbox: 300 pembayaran voucher antar enam agent dalam satu epoch, lalu close_epoch dan siklus.
+// TC-AG-009-01..03 on near-sandbox: 300 voucher payments among six agents in one epoch, then close_epoch and the cycle.
 import { afterAll, describe, expect, it } from "vitest";
 import { createAgentBuyer } from "../shared/x207.ts";
 import { AGENT_NAMES, AGENTS } from "../shared/registry.ts";
@@ -29,7 +29,7 @@ describe.skipIf(!sandboxAvailable)("AG-009 dense six-agent scenario", () => {
     expect(new Set(plan.map((p) => p.buyer)).size).toBe(6);
     expect(new Set(plan.map((p) => p.seller)).size).toBe(6);
 
-    // Satu transaksi registrasi per pasangan, jauh di bawah 300 panggilan.
+    // One registration transaction per pair, far fewer than 300 calls.
     expect(await stack.scheduler.tick()).toMatchObject({ registered: 12, dropped: 0, retrying: 0 });
 
     const epoch = (await fx.sandbox.view<{ epoch: number; cutoff_at: string }>(fx.circle.accountId, "get_epoch", {}));

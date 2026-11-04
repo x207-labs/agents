@@ -1,6 +1,6 @@
-// Skenario aset beragam (AG-019, F9): compute, data, akses akun, dan aset yang dialihkan native dicocokkan lewat buku marketplace,
-// sedangkan kelas `X` ditolak. Setiap pasangan berjalan dengan `PolicyAgent` (AG-016): listing, tawaran, tawar balik, terima, lalu
-// kedua pihak menandatangani bundle. Pencocokan di sini lewat listing yang saling melengkapi; solver (SV-013) akan mengambil alih.
+// Assorted assets scenario (AG-019, F9): compute, data, account access, and natively transferred assets are matched through the marketplace book,
+// while class `X` is rejected. Each pair runs with a `PolicyAgent` (AG-016): listing, offer, counter, accept, then
+// both parties sign the bundle. Matching here goes through complementary listings; the solver (SV-013) will take over.
 import { signListing, type Listing } from "@x207/core";
 import { BookClient, BookError } from "../shared/barter.ts";
 import { DEFAULT_BARTER_POLICY, PolicyAgent, type BarterPolicy, type Holding, type Need } from "../shared/barter-policy.ts";
@@ -11,17 +11,17 @@ const CREDIT = 1_000_000;
 export type AssetPair = {
   seller: string;
   buyer: string;
-  /** Yang dijual `seller` dan dicari `buyer`. */
+  /** What `seller` sells and `buyer` seeks. */
   sold: Holding;
-  /** Yang dijual `buyer` dan dicari `seller`. */
+  /** What `buyer` sells and `seller` seeks. */
   paid: Holding;
-  /** Harga satuan tertinggi yang mau dibayar `buyer` untuk `sold`; default `sold.unitValue`. */
+  /** The highest unit price `buyer` is willing to pay for `sold`; default `sold.unitValue`. */
   buyerMaxUnitValue?: string;
 };
 
 const unit = (credits: number): string => String(credits * CREDIT);
 
-/** Tiga pasangan lintas kelas: compute (D) ↔ data (C), akses akun (B) ↔ jasa (D), aset native (A) ↔ data (C). */
+/** Three cross-class pairs: compute (D) ↔ data (C), account access (B) ↔ service (D), native asset (A) ↔ data (C). */
 export const ASSET_PAIRS: readonly AssetPair[] = [
   {
     seller: "gpu",
@@ -51,7 +51,7 @@ export type PairOutcome = {
   paidType: string;
   paidClass: string;
   listingHash: string;
-  /** Urutan langkah negosiasi, mis. `bid`, `countered`, `accepted`. */
+  /** Order of negotiation steps, e.g. `bid`, `countered`, `accepted`. */
   steps: string[];
   bundle: { termsHash: string; status: string; participants: number } | null;
 };
@@ -73,14 +73,14 @@ const policyFor = (side: Holding, other: Holding, maxUnitValue = other.unitValue
 export type AssetScenarioOptions = {
   book: BookClient;
   identities: Record<string, AgentIdentity>;
-  /** Akun kontrak lingkaran, penerima NEP-413. */
+  /** Circle contract account, NEP-413 recipient. */
   contractId: string;
   /** Detik unix. */
   now: () => number;
   pairs?: readonly AssetPair[];
 };
 
-/** Satu pasangan: penjual melisting, pembeli menawar, keduanya bernegosiasi sampai bundle yang ditandatangani kedua pihak. */
+/** One pair: the seller lists, the buyer bids, both negotiate until a bundle signed by both parties. */
 async function runPair(pair: AssetPair, options: AssetScenarioOptions): Promise<PairOutcome> {
   const make = (name: string, mine: Holding, theirs: Holding, max?: string) =>
     new PolicyAgent({ identity: options.identities[name]!, book: options.book, contractId: options.contractId, policy: policyFor(mine, theirs, max), now: options.now });
@@ -94,7 +94,7 @@ async function runPair(pair: AssetPair, options: AssetScenarioOptions): Promise<
     for (const move of moves) steps.push(move.kind);
     if (moves.some((m) => m.kind === "accepted" || m.kind === "rejected")) break;
   }
-  // Pihak yang tidak menerima menandatangani bundle.
+  // The party that does not accept signs the bundle.
   await seller.signProposals();
   await buyer.signProposals();
   const proposal = (await options.book.proposals(options.identities[pair.seller]!.accountId, "all")).find((p) => p.listingHash === hash);
@@ -106,8 +106,8 @@ async function runPair(pair: AssetPair, options: AssetScenarioOptions): Promise<
 }
 
 /**
- * Aset yang ditolak: kelas `X` (mis. paket langganan konsumen yang melarang pembagian) ditandatangani lalu dikirim langsung ke buku
- * karena `buildListing` sudah menolaknya di sisi agent; server harus menjawab `asset_class_rejected`.
+ * Rejected asset: class `X` (e.g. a consumer subscription plan that forbids sharing) is signed then sent straight to the book
+ * because `buildListing` already rejects it on the agent side; the server must answer `asset_class_rejected`.
  */
 async function tryClassX(options: AssetScenarioOptions, account: string): Promise<RejectedOutcome[]> {
   const identity = options.identities[account]!;
@@ -122,7 +122,7 @@ async function tryClassX(options: AssetScenarioOptions, account: string): Promis
   try {
     signature = signListing(listing, identity.voucherSecretKey);
   } catch {
-    // SDK menolak kelas X saat menandatangani; server tetap diuji dengan tanda tangan kosong
+    // the SDK rejects class X when signing; the server is still tested with an empty signature
   }
   try {
     await options.book.postListing(listing, signature);

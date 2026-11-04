@@ -54,10 +54,10 @@ describe("AG-021 invoices become vouchers and netting", () => {
     expect(n.before - n.cleared).toBe(n.after);
     expect(n.settlement).toBe(40_000_000n);
     expect(n.residual.map((e) => `${e.debtor.split(".")[0]}>${e.creditor.split(".")[0]}:${e.amount / 1_000_000n}`).sort()).toEqual(["maker>supplier:40", "retailer>maker:20"]);
-    // piutang − utang: supplier +100−60 = +40, maker −100+80 = −20, retailer +60−80 = −20
+    // receivable − debt: supplier +100−60 = +40, maker −100+80 = −20, retailer +60−80 = −20
     expect(n.net).toEqual({ [B.maker]: -20_000_000n, [B.supplier]: 40_000_000n, [B.retailer]: -20_000_000n });
     expect(Object.values(n.net).reduce((a, b) => a + b, 0n)).toBe(0n);
-    // posisi bersih dari sisa edge sama dengan dari invoice asal
+    // net position from the remaining edges equals that from the source invoices
     const fromResidual: Record<string, bigint> = {};
     for (const e of n.residual) {
       fromResidual[e.debtor] = (fromResidual[e.debtor] ?? 0n) - e.amount;

@@ -1,4 +1,4 @@
-// TC-AG-007-01 di near-sandbox: function-call key agent tidak bisa melampirkan deposit (ADR-11b).
+// TC-AG-007-01 on near-sandbox: the agent function-call key cannot attach a deposit (ADR-11b).
 import { afterAll, describe, expect, it } from "vitest";
 import { deployCircle, type CircleFixture } from "../../sdk/test-support/circle.ts";
 import { sandboxAvailable } from "../../sdk/test-support/sandbox.ts";
@@ -20,7 +20,7 @@ describe.skipIf(!sandboxAvailable)("AG-007 deposit through a function-call key",
     });
     expect(withDeposit.failures.join(" ")).toMatch(/DepositWithFunctionCall|deposit/i);
 
-    // Kontrol: function call yang sama tanpa deposit lolos pemeriksaan kunci (kontrak USDT yang menolak karena 1 yocto).
+    // Control: the same function call without a deposit passes the key check (the USDT contract rejects it because of 1 yocto).
     const withoutDeposit = await restricted.call({
       receiverId: fx.usdt.accountId, methodName: "ft_balance_of", args: { account_id: agent.accountId }, deposit: 0n,
     });

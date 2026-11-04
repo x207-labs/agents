@@ -1,5 +1,5 @@
-// AG-020 di near-sandbox: agent pengadaan `gpu` membeli dari agent lain dengan voucher nyata; pembelian di luar batas tidak
-// menghasilkan voucher, jadi kewajiban on-chain hanya sebesar pembelian yang disetujui.
+// AG-020 on near-sandbox: procurement agent `gpu` buys from other agents with real vouchers; a purchase outside the limits
+// produces no voucher, so the on-chain obligation is only the size of the approved purchases.
 import { afterAll, describe, expect, it } from "vitest";
 import { ProcurementAgent } from "../scenario/business.ts";
 import { AGENTS } from "../shared/registry.ts";
@@ -19,7 +19,7 @@ describe.skipIf(!sandboxAvailable)("AG-020 procurement on near-sandbox", () => {
     const service = (name: "translator" | "summarizer" | "cleaner", maxPrice: string) => ({ name: AGENTS[name].verb, url: urls[name], path: `/api/${AGENTS[name].verb}`, maxPrice });
     const agent = new ProcurementAgent({
       account: identity.gpu.accountId,
-      // harga tiap jasa 20000 (0,02 credit): translate dan clean boleh, summarize dibatasi 10000 (di bawah harga), image tidak terdaftar
+      // each service price is 20000 (0.02 credit): translate and clean allowed, summarize capped at 10000 (below the price), image not registered
       policy: { spend: { maxPerCall: "50000", maxPerEpoch: "60000" }, services: [service("translator", "30000"), service("summarizer", "10000"), service("cleaner", "30000")] },
       pay: createAgentBuyer(identity.gpu, { rpcUrls: [fx.sandbox.rpcUrl] }),
     });

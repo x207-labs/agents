@@ -1,18 +1,18 @@
-// Pencari otonom sisi agent (AG-018, F9): mendatangi agent idle yang opt-in dan menyiapkan penawaran ke listing berdiskon.
-// Jalur bayar bila listing menerima pembayaran dan agent bisa membayar, selain itu barter bila agent punya barang yang dicari listing.
-// Pagar spam sama dengan solver (SV-016): tanpa opt-in tidak ada penawaran, paling banyak `maxOffersPerAgent` per periode, dan
-// pasangan (agent, listing) yang pernah ditolak tidak ditawari lagi. Rencana tidak mengirim apa pun; pengirim memanggil `record`.
+// Autonomous seeker on the agent side (AG-018, F9): visits idle agents that opted in and prepares offers to discounted listings.
+// Pay path if the listing accepts payment and the agent can pay, otherwise barter if the agent holds goods the listing seeks.
+// Spam guard same as the solver (SV-016): no opt-in means no offer, at most `maxOffersPerAgent` per period, and
+// a (agent, listing) pair that was rejected is not offered again. The plan sends nothing; the sender calls `record`.
 import type { ListingView } from "./barter.ts";
 
-/** Agent yang boleh dikunjungi pencari. */
+/** An agent the seeker may visit. */
 export type VisitedAgent = {
   account: string;
-  /** Agent setuju menerima ajakan pencari. */
+  /** The agent agrees to receive seeker referrals. */
   optIn: boolean;
-  /** Tidak ada negosiasi atau bundle yang sedang berjalan. */
+  /** No negotiation or bundle is in progress. */
   idle: boolean;
   canPay: boolean;
-  /** Barang yang bisa diserahkan. */
+  /** Goods that can be handed over. */
   offers: Array<{ assetType: string; assetClass: string; quantity: number }>;
 };
 
@@ -20,15 +20,15 @@ export type SeekerPlan = {
   to: string;
   listing: ListingView;
   mode: "pay" | "barter";
-  /** Nilai listing; hitungan diskon dan jatah mengikuti `planOffer`. */
+  /** Listing value; the discount and share calculation follow `planOffer`. */
   value: string;
   quantity: number;
 };
 
 export type SeekerBotConfig = {
-  /** Akun yang menerima jatah pencari. */
+  /** Account that receives the seeker share. */
   seeker: string;
-  /** Jatah pencari, bps dari nilai listing; tidak boleh melebihi diskon listing. */
+  /** Seeker share, bps of the listing value; must not exceed the listing discount. */
   searcherShareBps: number;
   maxOffersPerAgent: number;
   periodSeconds: number;
@@ -55,7 +55,7 @@ export class SeekerBot {
     return (this.#sent.get(agent) ?? []).filter((t) => t > now - this.config.periodSeconds).length;
   }
 
-  /** Rencana deterministik: agent urut akun, listing urut hash; tidak mengirim apa pun. `now` dalam detik unix. */
+  /** Deterministic plan: agents ordered by account, listings ordered by hash; sends nothing. `now` in unix seconds. */
   plan(listings: readonly ListingView[], agents: readonly VisitedAgent[], now: number): SeekerPlan[] {
     const book = listings
       .filter((l) => l.discountBps > 0 && l.discoverable && l.status === "open" && Date.parse(l.expiresAt) / 1000 > now)
