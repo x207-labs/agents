@@ -62,18 +62,20 @@ export async function listLicense(book: LicenseBook, seller: LicenseActor, o: {
   plain: Uint8Array; assetType: string; licenseId: string; exclusive?: boolean; nonce: string; price: string; expiresAt: number; claimedPlain?: Uint8Array
   /** The text of the license; its sha256 is the `license_hash` of the listing. Default: a fixed placeholder text. */
   terms?: string
+  /** A free text sample of the content that the book shows before the purchase (UM-110): its hash goes in the license document, and the book refuses one that holds personal data. */
+  preview?: string
 }): Promise<Sold> {
   const { ciphertext, key } = encryptContent(o.plain);
   const doc: LicenseDocument = {
     circle: book.contract, seller: seller.account, content_hash: contentHash(o.claimedPlain ?? o.plain), license_id: o.licenseId, license_hash: sha256Hex(o.terms ?? "terms of the license"),
-    preview_hash: null, exclusive: o.exclusive ?? false, nonce: o.nonce,
+    preview_hash: o.preview === undefined ? null : sha256Hex(o.preview.trim()), exclusive: o.exclusive ?? false, nonce: o.nonce,
   };
   const docHash = licenseDocumentHash(doc);
   const listing: Listing = {
     circle: book.contract, account: seller.account,
     offer: { asset_type: o.assetType, asset_class: "B", quantity: 1, value: o.price },
     want: { asset_type: "usdc", asset_class: "A", quantity: 1, value: o.price },
-    terms: o.terms ?? "license of the content", detail: JSON.stringify({ kind: "license", asset_type: o.assetType, license_doc: docHash, content_hash: doc.content_hash, license_id: doc.license_id, license_hash: doc.license_hash, exclusive: doc.exclusive }),
+    terms: o.terms ?? "license of the content", detail: JSON.stringify({ kind: "license", asset_type: o.assetType, license_doc: docHash, content_hash: doc.content_hash, license_id: doc.license_id, license_hash: doc.license_hash, exclusive: doc.exclusive, ...(o.preview === undefined ? {} : { preview: o.preview, preview_hash: doc.preview_hash }) }),
     expires_at: o.expiresAt, discount_bps: 0, accept_payment: true, discoverable: true, nonce: `lic-${o.nonce}`,
   };
   await book.postListing(listing, seller.secretKey);
