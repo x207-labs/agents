@@ -16,6 +16,8 @@ export type TransferActor = InvoiceActor;
 export type TransferState = {
   transferId: number; listingHash: string; buyer: string; seller: string; platform: TransferPlatform; proofMethod: string; transferRef: string;
   status: "paid_held" | "confirmed" | "cancelled"; windowUntil: number; tradeOfferId: string | null; proof: Record<string, unknown> | null; cancelReason: string | null;
+  /** The buyer asked to cancel a transfer that has an objective proof: the voucher is still held and the proof can still pay the seller until the window ends. */
+  cancelRequested?: boolean;
   voucher?: UnsignedVoucher; voucherSignature?: string; instructions?: { setTxtAfterTransfer: string; on: string };
 }
 
