@@ -147,6 +147,55 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-030 one-time codes against the real book
     expect(await code(serveCode(book, seller, p2.purchaseId, two, ref("r5b"), second))).toBe("code_used");
     expect((await book.get(p2.purchaseId)).status).toBe("cancelled");
   });
+
+  it("TC-AG-030-13 [B7-C3] two codes from the same seller: the second voucher continues from the held one (seq above, cumulative = held + price); the same cumulative or the state of the contract again is refused", async () => {
+    const { book, issuer, actor, expiresAt } = await start();
+    const [seller, buyer] = [actor("andi"), actor("budi")];
+    issuer.issue(GIFT).issue("SECOND-CODE-1234-ZZ").issue("THIRD-CODE-5678-YY");
+    const mk = (c: string, nonce: string) => listCode(book, seller, { code: c, issuer: "shop.example", verifiable: true, price: credit(5), nonce, expiresAt });
+    const [one, two, three] = [await mk(GIFT, "h1"), await mk("SECOND-CODE-1234-ZZ", "h2"), await mk("THIRD-CODE-5678-YY", "h3")];
+    const first = await buyCode(book, buyer, one, 42, { seq: 0, cumulative: "0" });
+    expect(first.status).toBe("paid_held");
+    expect(await code(buyCode(book, buyer, two, 42, { seq: 0, cumulative: "0" }))).toBe("invalid_request"); // the contract state again: the held voucher is counted
+    expect(await code(buyCode(book, buyer, two, 42, { seq: 1, cumulative: "0" }))).toBe("invalid_request"); // seq above, but the cumulative adds nothing over the held one
+    const second = await buyCode(book, buyer, two, 42, { seq: 1, cumulative: credit(5) });
+    expect(second.status).toBe("paid_held");
+    const third = await buyCode(book, buyer, three, 42, { seq: 2, cumulative: credit(10) });
+    expect(third.status).toBe("paid_held");
+  });
+
+  it("TC-AG-030-14 [B7-C1] a buyer of the listing files no takedown: it is refused and the purchase stays; a stranger's takedown does not cancel a code purchase after the key is released", async () => {
+    const { book, issuer, actor, expiresAt, publish } = await start();
+    const [seller, buyer, stranger] = [actor("andi"), actor("budi"), actor("citra")];
+    issuer.issue(GIFT);
+    const sold = await listCode(book, seller, { code: GIFT, issuer: "shop.example", verifiable: true, price: credit(5), nonce: "t1", expiresAt });
+    const bought = await buyCode(book, buyer, sold, 42, { seq: 0, cumulative: "0" });
+    publish(ref("t1").ref, sold.ciphertext);
+    await serveCode(book, seller, bought.purchaseId, sold, ref("t1"), buyer);
+    expect(await code(book.takedown(sold.listingHash, buyer, "I own the rights"))).toBe("takedown_invalid");
+    await book.takedown(sold.listingHash, stranger, "I own the rights"); // allowed for a member who is not a party, and it must not take the sale down after the key is out
+    expect((await book.get(bought.purchaseId)).status).toBe("key_released");
+  });
+
+  it("TC-AG-030-15 [B7-C2] when the source no longer serves the signed ciphertext, a complaint of the buyer ends the sale disputed (notDelivered) and the voucher stays held; with the ciphertext served it is only a complaint", async () => {
+    const { book, issuer, actor, expiresAt, publish } = await start();
+    const [seller, buyer, other] = [actor("andi"), actor("budi"), actor("citra")];
+    issuer.issue(GIFT).issue("SECOND-CODE-1234-ZZ");
+    const a = await listCode(book, seller, { code: GIFT, issuer: "shop.example", verifiable: true, price: credit(5), nonce: "n1", expiresAt });
+    const pa = await buyCode(book, buyer, a, 42, { seq: 0, cumulative: "0" });
+    publish(ref("n1").ref, a.ciphertext);
+    await serveCode(book, seller, pa.purchaseId, a, ref("n1"), buyer);
+    files.delete(ref("n1").ref.replace("https://", "")); // the seller takes the file away after the release
+    const gone = await book.complain(pa.purchaseId, buyer);
+    expect(gone).toMatchObject({ status: "disputed", notDelivered: true });
+    expect((await book.get(pa.purchaseId)).voucher).toBeUndefined();
+    const b = await listCode(book, seller, { code: "SECOND-CODE-1234-ZZ", issuer: "shop.example", verifiable: true, price: credit(5), nonce: "n2", expiresAt });
+    const pb = await buyCode(book, other, b, 42, { seq: 0, cumulative: "0" });
+    publish(ref("n2").ref, b.ciphertext);
+    await serveCode(book, seller, pb.purchaseId, b, ref("n2"), other);
+    const complaint = await book.complain(pb.purchaseId, other);
+    expect(complaint).toMatchObject({ status: "key_released", complaint: true });
+  });
 });
 
 /** The seller tries to release the key again without asking the issuer: the book wants a fresh verdict. */

@@ -196,6 +196,16 @@ export class MockCodeBook implements CodeBookApi {
 
 /** Buku kode asli (BE-069) lewat HTTP: rute pembelian BE-056 yang sama, ditambah `POST /listings/{hash}/code-check`. */
 export class HttpCodeBook extends LicenseBook implements CodeBookApi {
+  /** `POST /listings/{hash}/takedown`: a claimant signs `{circle, listing_hash, claim, evidence_hash}`. A buyer of the listing is refused (`takedown_invalid`, B7-C1). */
+  takedown(hash: string, claimant: CodeActor, claim: string, evidenceHash = ""): Promise<unknown> {
+    const message = { circle: this.contract, listing_hash: hash, claim, evidence_hash: evidenceHash };
+    return this.call("POST", `/listings/${hash}/takedown`, { claim, evidence_hash: evidenceHash, signature: signJsonNotice(this.contract, message, claimant.secretKey) });
+  }
+  /** A buyer's notice `disputed` with reason `other` and no proof: a complaint, or `{notDelivered: true}` when the backend finds the signed ciphertext missing (B7-C2). */
+  async complain(id: string, buyer: CodeActor): Promise<CodePurchase & { complaint?: boolean; notDelivered?: boolean }> {
+    const notice = { circle: this.contract, purchase_id: id, actor: buyer.account, action: "disputed", at: this.at(), reason: "other", proof: null };
+    return (await this.call("POST", `/purchases/${id}`, { notice, signature: signJsonNotice(this.contract, notice, buyer.secretKey) })) as CodePurchase & { complaint?: boolean; notDelivered?: boolean };
+  }
   async check(hash: string, seller: CodeActor, code: string, salt: string): Promise<{ verdict: CodeCheck; checkedAt: number }> {
     const notice = { circle: this.contract, listing_hash: hash, actor: seller.account, action: "check", at: this.at() };
     const answer = await this.call("POST", `/listings/${hash}/code-check`, { notice, signature: signJsonNotice(this.contract, notice, seller.secretKey), code, salt });
