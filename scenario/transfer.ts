@@ -1,7 +1,7 @@
 // Agents that sell and buy a thing through the official feature of its platform (AG-031, pipeline P4, ADR-49) with the format of the SDK (SD-077): the transfer document and its hash,
 // the resource `x207:transfer:<hash>`, the TXT texts of the DNS proof, and the voucher of the buyer. The book is the real transfer ledger of the backend (BE-074) over HTTP: the voucher of the
 // buyer is held there until the platform shows that the transfer happened. Three proofs: a domain (the seller sets `x207-sell=<listing_hash>` before the listing, the buyer sets
-// `x207-own=<transfer id>` after the transfer), a game item (the trade offer is accepted and its hold is over), a ticket (the buyer confirms). A seller who does not transfer is not paid:
+// `x207-own=<transfer id>-<token>` after the transfer, the text that the purchase answer gives it), a game item (the trade offer is accepted and its hold is over), a ticket (the buyer confirms). A seller who does not transfer is not paid:
 // the window of the platform passes and the voucher never moves. The agents talk to the platform only through the book; the platforms themselves (the registrar, Steam) are what the tests mock.
 import {
   listingHash, normalizeTransfer, sellTxt, signVoucher, transferDocumentHash, transferVoucher,
