@@ -4,7 +4,7 @@
 // `x207-own=<transfer id>` after the transfer), a game item (the trade offer is accepted and its hold is over), a ticket (the buyer confirms). A seller who does not transfer is not paid:
 // the window of the platform passes and the voucher never moves. The agents talk to the platform only through the book; the platforms themselves (the registrar, Steam) are what the tests mock.
 import {
-  listingHash, normalizeTransfer, ownTxt, sellTxt, signVoucher, transferDocumentHash, transferVoucher,
+  listingHash, normalizeTransfer, sellTxt, signVoucher, transferDocumentHash, transferVoucher,
   type Listing, type TransferDocument, type TransferPlatform, type UnsignedVoucher, type VoucherSecretKey,
 } from "@x207/core";
 import { BookError, signJsonNotice, type InvoiceActor } from "./invoice-book.ts";
@@ -104,8 +104,15 @@ export function releasePair(pair: PairState, before: PairState): void {
   pair.cumulative = before.cumulative;
 }
 
-/** The text that the buyer of a domain sets on it once the registrar has moved it: `x207-own=<transfer id>`. */
-export const buyerTxt = (transfer: Pick<TransferState, "transferId">): string => ownTxt(transfer.transferId);
+/**
+ * The text that the buyer of a domain sets on it once the registrar has moved it. Since UM-096 the backend gives it in the answer of the purchase (`instructions.setTxtAfterTransfer`,
+ * `x207-own=<transfer id>-<token>`, the token derived from the voucher signature of the buyer), so a third party cannot predict it from the transfer id: read it from there.
+ */
+export const buyerTxt = (transfer: Pick<TransferState, "transferId" | "instructions">): string => {
+  const given = transfer.instructions?.setTxtAfterTransfer;
+  if (given === undefined) throw new Error(`transfer ${transfer.transferId}: the answer of the purchase has no instructions.setTxtAfterTransfer`);
+  return given;
+};
 
 /** The buyer asks the book to check the proof now, and again until it is met or the window ends; `wait` is the pause of the agent between two asks. */
 export async function waitForProof(book: HttpTransferBook, id: number, o: { tradeOfferId?: string; tries: number; wait: () => Promise<void> }): Promise<ProofResult> {

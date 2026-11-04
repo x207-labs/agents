@@ -73,13 +73,16 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-031 transfer through the platform agains
     const p = pair();
     const bought = await buyTransfer(book, budi, sale, 42, p);
     expect([bought.status, bought.platform, bought.proofMethod]).toEqual(["paid_held", "domain", "dns_txt"]);
-    expect(bought.instructions).toEqual({ setTxtAfterTransfer: buyerTxt(bought), on: DOMAIN });
+    expect(bought.instructions).toEqual({ setTxtAfterTransfer: expect.stringMatching(new RegExp(`^x207-own=${bought.transferId}-[0-9a-f]{32}$`)), on: DOMAIN });
     expect(bought.windowUntil - book.at()).toBe(TRANSFER_WINDOW_SECONDS.domain);
     expect(bought.voucher).toBeUndefined();
 
     // the registrar has not moved the domain and the buyer has no TXT: pending, and the book says what it wants
     const early = await book.proof(bought.transferId);
-    expect(early).toMatchObject({ outcome: "pending", missing: { want: buyerTxt(bought) } });
+    expect(early).toMatchObject({ outcome: "pending" });
+    // since UM-096 the answer names the TXT record and does not show its value
+    expect((early as unknown as { missing: { want: string } }).missing.want).toMatch(/x207-own TXT record/);
+    expect(JSON.stringify(early)).not.toContain(buyerTxt(bought));
     // the registrar moves the domain; the buyer sets its TXT, but the registry still says the transfer is pending
     dns.set(DOMAIN, [sale.sellerTxt!, buyerTxt(bought)]);
     rdap.set(DOMAIN, { ldhName: DOMAIN, status: ["pending transfer"] });
