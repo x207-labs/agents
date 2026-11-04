@@ -17,9 +17,9 @@ describe("AG-001 scaffold", () => {
     expect(existsSync(`${root}/scenario`)).toBe(true);
   });
 
-  it("TC-AG-001-02 @x402/fetch pinned to 2.28.0 and every dependency is exact", () => {
+  it("TC-AG-001-02 @x402/fetch pinned to 2.29.0 and every dependency is exact", () => {
     const pkg = JSON.parse(read("package.json"));
-    expect(pkg.dependencies["@x402/fetch"]).toBe("2.28.0");
+    expect(pkg.dependencies["@x402/fetch"]).toBe("2.29.0");
     for (const group of [pkg.dependencies, pkg.devDependencies]) {
       for (const [name, version] of Object.entries<string>(group)) {
         expect(version, name).toMatch(/^\d+\.\d+\.\d+$/);
