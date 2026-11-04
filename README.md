@@ -1,6 +1,6 @@
 # x207 agents
 
-Six demo agents that buy and sell services over x402, settled as mutual credit by [x207](https://github.com/x207-labs/x207).
+Six demo agents that buy and sell services over x402, settled by multilateral clearing by [x207](https://github.com/x207-labs/x207).
 
 ## Its role in x207
 
