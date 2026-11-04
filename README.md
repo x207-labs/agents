@@ -6,6 +6,25 @@ Six demo agents that buy and sell services over x402, settled as mutual credit b
 
 The agents show what the layer is for. Each one sells a small service (translate, summarize, scrape, image, clean, compute) behind an x402 paywall and buys from the others, paying with signed vouchers instead of one transfer per call. They use only public packages: `@x402/fetch`, `@x207/scheme` and `@x207/core` from the [SDK](https://github.com/x207-labs/sdk). The `scenario/` folder holds the scenarios that the demos and end-to-end tests of the umbrella (`demo/`) import, run against the [contract](https://github.com/x207-labs/contracts).
 
+```mermaid
+sequenceDiagram
+  participant B as Buyer agent
+  participant A as Seller agent
+  participant N as NEAR AI Cloud
+  participant F as Facilitator
+  B->>A: GET /api/summarize
+  A-->>B: 402 (x207 voucher or exact)
+  B->>A: retry with signed voucher
+  A->>F: verify
+  A->>N: chat completion
+  alt inference ok
+    N-->>A: text
+    A-->>B: 200 + PAYMENT-RESPONSE
+  else inference fails
+    A-->>B: 502, nothing settles
+  end
+```
+
 | Agent | Folder | Default port | Route |
 | --- | --- | --- | --- |
 | translator | `agents/translator` | 4201 | `GET /api/translate?input=...` |
