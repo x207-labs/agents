@@ -1,5 +1,7 @@
 // The only module that knows the NEAR AI Cloud endpoint (ADR-12). Inference text stays here
 // and in the HTTP response of the agent; it is never written to the contract or D9.
+import { writeSync } from "node:fs";
+
 const DEFAULT_BASE_URL = "https://cloud-api.near.ai/v1";
 export const DEFAULT_MODEL = "z-ai/glm-5.3-flash"; // ADR-33; fallback Qwen/Qwen3.8-27B
 
@@ -33,7 +35,8 @@ export type NearAiOptions = {
 export function createNearAiClient(opts: NearAiOptions): LlmClient {
   const env = opts.env ?? process.env;
   const doFetch = opts.fetch ?? fetch;
-  const log = opts.log ?? ((line: string) => console.log(line));
+  // writeSync(1): a test runner that captures console.log (vitest) still shows these lines, so the token counts of a live demo are not lost (AG-034).
+  const log = opts.log ?? ((line: string) => writeSync(1, `${line}\n`));
   const modeRaw = env.NEARAI_MODE || "live";
   if (modeRaw !== "live" && modeRaw !== "mock") {
     throw new NearAiConfigError(`NEARAI_MODE must be "live" or "mock", got "${modeRaw}"`);
