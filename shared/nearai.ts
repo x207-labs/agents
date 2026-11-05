@@ -84,12 +84,15 @@ export function createNearAiClient(opts: NearAiOptions): LlmClient {
       }
       record(res.status, started);
       const body = (await res.json().catch(() => ({}))) as {
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
         choices?: { message?: { content?: string } }[];
         error?: { message?: string; type?: string };
       };
       if (!res.ok) {
         throw new NearAiError(body.error?.message ?? `NEAR AI returned ${res.status}`, res.status, body.error?.type);
       }
+      // AG-033: token counts only (no text, no key), so the cost per agent can be read from the log.
+      if (body.usage) log(`[nearai] agent=${opts.agent} usage prompt_tokens=${body.usage.prompt_tokens ?? 0} completion_tokens=${body.usage.completion_tokens ?? 0}`);
       const content = body.choices?.[0]?.message?.content;
       if (typeof content !== "string") throw new NearAiError("NEAR AI response has no message content", res.status);
       return content;
