@@ -180,12 +180,15 @@ export async function decide(ctx: DecisionContext, llm?: LlmClient): Promise<Dec
   if (!llm || llm.mode !== "live") return { ...base, source: "rule" };
   const system =
     'You decide for a barter agent. Reply with JSON only: {"action":"accept"}, {"action":"counter","value":"<integer>"} or {"action":"reject","reason":"<short>"}. ' +
-    "Amounts are integers in credit micro-units. Respect the owner policy exactly.";
-  const input = JSON.stringify({ role: ctx.role, listing: ctx.listing, offer: ctx.offer, ownLastValue: ctx.ownLastValue, policy: ctx.policy, ruleSuggestion: base });
+    "Amounts are integers in credit micro-units. Follow the rule suggestion unless you have a reason to deviate within the round limit.";
+  // A-AG-18: the owner's reservation prices (floors, ceilings, unit values) do not leave this process; the model gets the thread and the rule's answer, and `validAgainstPolicy` checks what it says
+  const input = JSON.stringify({ role: ctx.role, listing: ctx.listing, offer: ctx.offer, ownLastValue: ctx.ownLastValue, maxRounds: ctx.policy.maxRounds, ruleSuggestion: base });
   try {
     const raw = await llm.complete(system, input);
     const parsed = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as Decision;
-    if (parsed && ["accept", "counter", "reject"].includes(parsed.action) && validAgainstPolicy(parsed, ctx)) return { ...parsed, source: "llm" };
+    if (parsed && ["accept", "counter", "reject"].includes(parsed.action) && validAgainstPolicy(parsed, ctx)) {
+      return { ...parsed, ...(parsed.action === "reject" ? { reason: parsed.reason.slice(0, 120) } : {}), source: "llm" };
+    }
   } catch {
     // model output is unreadable: use the base rule
   }

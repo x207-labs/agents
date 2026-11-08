@@ -114,6 +114,17 @@ describe("AG-016 LLM mode obeys the policy", () => {
     expect(await decide(ctx({ value: C(85) }), llm(reply))).toEqual({ action: "counter", value: C(93), source: "llm" });
   });
 
+  it("TC-AG-048-01 the model never receives the reservation prices of the owner, and a long reason is cut (A-AG-18)", async () => {
+    const inputs: string[] = [];
+    const client: LlmClient = { mode: "live", model: "m", async complete(_system: string, input: string) { inputs.push(input); return `{"action":"reject","reason":"${"x".repeat(500)}"}`; } };
+    const result = await decide(ctx({ value: C(40) }), client);
+    expect(inputs).toHaveLength(1);
+    for (const secret of ["minAcceptBps", "rejectBelowBps", "openingBps", "maxUnitValue", "unitValue", "holdings", "needs", "9200000"]) expect(inputs[0]).not.toContain(secret);
+    expect(inputs[0]).toContain("ruleSuggestion");
+    expect(result).toMatchObject({ action: "reject", source: "llm" });
+    expect((result as { reason: string }).reason).toHaveLength(120);
+  });
+
   it("a proposal that breaks the floor or is malformed is discarded", async () => {
     expect(await decide(ctx({ value: C(85) }), llm('{"action":"accept"}'))).toMatchObject({ action: "counter", value: C(95), source: "rule" });
     expect(await decide(ctx({ value: C(85) }), llm(`{"action":"counter","value":"${C(60)}"}`))).toMatchObject({ source: "rule" });
