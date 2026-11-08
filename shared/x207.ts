@@ -25,6 +25,8 @@ export type BuyerOptions = {
   fetch?: typeof fetch;
   /** F5 bundle leg (SD-048): `bundle_id` for payment to `payee` in `epoch`, or `undefined` if not a leg. */
   bundleFor?: (payee: string, epoch: number) => number | undefined;
+  /** A-AG-08/09: what the 402 of a seller may name (circles, payees, the open epoch); without it the buyer follows the seller. See `X207ClientOptions.accept`. */
+  accept?: { circles?: readonly string[]; payees?: readonly string[]; currentEpoch?: () => Promise<number | null> };
 };
 
 /** `fetch` that pays the 402 with a voucher signed by the agent voucher key; never sends a transaction. */
@@ -35,6 +37,7 @@ export function createAgentBuyer(identity: AgentIdentity, options: BuyerOptions 
     // AG-008: the owner spend policy becomes the client guard; a voucher above the limit is never signed
     spendLimit: { maxPerCall: identity.policy.maxPerCall, maxPerEpoch: identity.policy.maxPerEpoch },
     ...(options.bundleFor ? { bundleFor: options.bundleFor } : {}),
+    ...(options.accept ? { accept: options.accept } : {}),
     headroom: headroomFromRpc({
       ...(options.rpcUrls ? { rpcUrls: options.rpcUrls } : {}),
       ...(options.fetch ? { fetch: options.fetch } : {}),
