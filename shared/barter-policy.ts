@@ -96,8 +96,11 @@ export function buyerQuantityCap(policy: BarterPolicy, side: Pick<Listing["offer
 /** Base rule. Seller: accept above the floor, reject below the lower bound, otherwise counter downward from the listing price each round. */
 export function decideRule(ctx: DecisionContext): Decision {
   const { listing, offer, policy } = ctx;
+  // A-AG-16: an amount that is not a plain integer made BigInt() throw and stopped the whole run; a zero value passed the floor of a 1-unit listing (bps rounds down to 0)
+  if (!/^\d+$/.test(listing.offer.value) || !/^\d+$/.test(offer.value)) return { action: "reject", reason: "bad_amount" };
   const listed = BigInt(listing.offer.value);
   const value = BigInt(offer.value);
+  if (value === 0n) return { action: "reject", reason: "value_not_positive" };
   if (listing.expires_at <= ctx.now) return { action: "reject", reason: "listing_expired" };
   if (offer.mode === "pay" && !listing.accept_payment) return { action: "reject", reason: "payment_not_accepted" };
 
@@ -114,6 +117,8 @@ export function decideRule(ctx: DecisionContext): Decision {
   }
 
   // The bidder judges the seller's counter-offer: accept if it does not exceed the need ceiling.
+  // A-AG-06: the ceiling is for the units the buyer needs; a counter with fewer units at that price is not the deal it wants
+  if (offer.quantity < buyerQuantityCap(policy, listing.offer)) return { action: "reject", reason: "quantity_below_need" };
   const cap = buyerCeiling(policy, listing.offer);
   if (value <= cap) return { action: "accept" };
   if (offer.round >= policy.maxRounds) return { action: "reject", reason: "max_rounds" };

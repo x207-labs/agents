@@ -31,6 +31,27 @@ const ctx = (over: Partial<DecisionContext> & { value?: string; round?: number; 
   ...(over.ownLastValue ? { ownLastValue: over.ownLastValue } : {}),
 });
 
+describe("AG-041 audit LOW findings (A-AG-06, A-AG-16)", () => {
+  it("TC-AG-041-01 the buyer does not accept a counter with fewer units than it needs, even at an acceptable price", () => {
+    const c = ctx({ role: "buyer", value: C(50), round: 2 });
+    expect(decideRule(c)).toEqual({ action: "accept" });
+    expect(decideRule({ ...c, offer: { ...c.offer, quantity: 4 } })).toEqual({ action: "reject", reason: "quantity_below_need" });
+  });
+
+  it("TC-AG-041-02 an amount that is not a plain integer is a rejection, not an exception that stops the run", () => {
+    const c = ctx({ value: C(95) });
+    expect(decideRule({ ...c, offer: { ...c.offer, value: "1.5" } })).toEqual({ action: "reject", reason: "bad_amount" });
+    expect(decideRule({ ...c, listing: { ...c.listing, offer: { ...c.listing.offer, value: "abc" } } })).toEqual({ action: "reject", reason: "bad_amount" });
+  });
+
+  it("TC-AG-041-03 value 0 never passes the floor, also on a listing so small that bps rounds the floor to 0", () => {
+    const c = ctx({ value: "0" });
+    const tiny = { ...c, listing: { ...c.listing, offer: { ...c.listing.offer, quantity: 1, value: "1" } } };
+    expect(decideRule(tiny)).toEqual({ action: "reject", reason: "value_not_positive" });
+    expect(decideRule({ ...tiny, role: "buyer", policy: buyerPolicy })).toEqual({ action: "reject", reason: "value_not_positive" });
+  });
+});
+
 describe("AG-016 decision rules (mock mode)", () => {
   it("the seller accepts above floor 90, counters between 50 and 90, rejects below 50", () => {
     expect(decideRule(ctx({ value: C(90) }))).toEqual({ action: "accept" });

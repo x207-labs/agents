@@ -2,3 +2,6 @@
 .env.*
 !.env.example
 node_modules/
+# A-AG-14: agent identities and owner keys the demos and onboarding write here (KEYS_DIR default)
+.keys/
+*.agent.json
