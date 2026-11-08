@@ -15,7 +15,7 @@ const terms = (other: string, amount: number): BundleTerms => ({
   legs: [{ payer: ME, payee: other, max_amount: C(amount) }, { payer: other, payee: ME, max_amount: C(amount) }],
 });
 
-function agent(proposals: Array<{ termsHash: string; terms: BundleTerms; missing: string[] }> = []) {
+function agent(proposals: Array<{ termsHash: string; terms: BundleTerms; missing: string[] }> = [], maxBundlePerEpoch?: string) {
   const signed: string[] = [];
   const book = {
     openEpoch: async () => 7,
@@ -23,7 +23,7 @@ function agent(proposals: Array<{ termsHash: string; terms: BundleTerms; missing
     signProposal: async (hash: string) => { signed.push(hash); },
     postIntent: async () => ({}),
   };
-  const a = new BarterAgent({ identity, book: book as never, contractId: CIRCLE, now: () => NOW });
+  const a = new BarterAgent({ identity, book: book as never, contractId: CIRCLE, now: () => NOW, ...(maxBundlePerEpoch === undefined ? {} : { maxBundlePerEpoch }) });
   return { a, signed };
 }
 
@@ -49,5 +49,35 @@ describe("AG-043 one intent, one signed bundle", () => {
     const answers = await a.answerProposals();
     expect(answers.map((x) => x.action)).toEqual(["signed", "rejected"]);
     expect(signed).toEqual([termsHash(t1)]);
+  });
+});
+
+describe("AG-046 the owner's epoch limit also bounds the bundles the agent signs", () => {
+  it("TC-AG-046-10 a bundle whose legs of this agent exceed maxPerEpoch is not signed (50 credit): evaluate says over_owner_limit, signTerms returns null", async () => {
+    const big = terms("x.x207-circle.test.near", 60); // this agent pays 60 credit, the limit is 50
+    const { a } = agent([{ termsHash: termsHash(big), terms: big, missing: [ME] }], C(50));
+    await a.postIntent({ service: "a", calls: 1, value: C(60) }, { service: "b", calls: 1, value: C(60) }, 3600);
+    expect(await a.evaluate({ termsHash: termsHash(big), terms: big, missing: [ME] } as never)).toEqual({ ok: false, reason: "over_owner_limit" });
+    expect(await a.signTerms(big)).toBeNull();
+    expect(a.intents).toHaveLength(1); // nothing was consumed
+  });
+
+  it("TC-AG-046-11 what was signed counts for the epoch: 30 credit is signed, a second 30 credit in the same epoch is not, the answer of answerProposals is rejected", async () => {
+    const t1 = terms("x.x207-circle.test.near", 30);
+    const t2 = terms("y.x207-circle.test.near", 30);
+    const { a, signed } = agent([{ termsHash: termsHash(t2), terms: t2, missing: [ME] }], C(50));
+    await a.postIntent({ service: "a", calls: 1, value: C(30) }, { service: "b", calls: 1, value: C(30) }, 3600);
+    await a.postIntent({ service: "a", calls: 1, value: C(30) }, { service: "b", calls: 1, value: C(30) }, 3600);
+    expect(await a.signTerms(t1)).not.toBeNull();
+    const answers = await a.answerProposals();
+    expect(answers).toEqual([{ termsHash: termsHash(t2), action: "rejected", reason: "over_owner_limit" }]);
+    expect(signed).toEqual([]);
+  });
+
+  it("TC-AG-046-12 without maxBundlePerEpoch nothing changes: the spend policy of micro payments (maxPerEpoch 50) does not refuse a 60 credit bundle", async () => {
+    const big = terms("x.x207-circle.test.near", 60);
+    const { a } = agent();
+    await a.postIntent({ service: "a", calls: 1, value: C(60) }, { service: "b", calls: 1, value: C(60) }, 3600);
+    expect(await a.signTerms(big)).not.toBeNull();
   });
 });
