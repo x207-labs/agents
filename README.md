@@ -36,6 +36,8 @@ sequenceDiagram
 
 Override a port with `<NAME>_PORT` (the agent name in capitals), for example `TRANSLATOR_PORT=5001` or `GPU_PORT=5006`.
 
+An agent listens on `127.0.0.1` (AG-038). `AGENT_HOST` picks another interface, but a free endpoint (no `FACILITATOR_URL`) with a live `NEARAI_API_KEY` refuses to start on a non-loopback host. The free endpoint answers at most 30 calls a minute per client (429) and refuses `input` above 4000 characters (413). The live client stops a call after `NEARAI_TIMEOUT_MS` (default 30000) and asks for at most `NEARAI_MAX_TOKENS` (default 1024) tokens.
+
 ## Try it
 
 Needs Node 22.22.2 or newer. Without credits or a network, in mock mode (the agent has no paywall until `FACILITATOR_URL` is set, so the call below is free):

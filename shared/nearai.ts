@@ -7,6 +7,15 @@ export const DEFAULT_MODEL = "z-ai/glm-5.3-flash"; // ADR-33; fallback Qwen/Qwen
 
 export type LlmMode = "live" | "mock";
 
+export const DEFAULT_TIMEOUT_MS = 30_000;
+export const DEFAULT_MAX_TOKENS = 1024;
+
+function positiveInt(raw: string | undefined, fallback: number, name: string): number {
+  if (raw === undefined || raw === "") return fallback;
+  if (!/^[1-9]\d*$/.test(raw)) throw new NearAiConfigError(`${name} must be a positive integer, got "${raw}"`);
+  return Number(raw);
+}
+
 export class NearAiConfigError extends Error {}
 
 export class NearAiError extends Error {
@@ -62,6 +71,9 @@ export function createNearAiClient(opts: NearAiOptions): LlmClient {
   const apiKey = env.NEARAI_API_KEY;
   if (!apiKey) throw new NearAiConfigError("NEARAI_API_KEY is empty: set it in .env or use NEARAI_MODE=mock");
   const baseUrl = (env.NEARAI_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  // A-AG-04: a call has a time limit and a cap on the answer, so one request cannot hang or spend an unbounded number of tokens
+  const timeoutMs = positiveInt(env.NEARAI_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, "NEARAI_TIMEOUT_MS");
+  const maxTokens = positiveInt(env.NEARAI_MAX_TOKENS, DEFAULT_MAX_TOKENS, "NEARAI_MAX_TOKENS");
 
   return {
     mode,
@@ -73,8 +85,10 @@ export function createNearAiClient(opts: NearAiOptions): LlmClient {
         res = await doFetch(`${baseUrl}/chat/completions`, {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(timeoutMs),
           body: JSON.stringify({
             model,
+            max_tokens: maxTokens,
             messages: [
               { role: "system", content: system },
               { role: "user", content: input },
