@@ -76,6 +76,23 @@ export type DecisionContext = {
   now: number;
 };
 
+/**
+ * The most the buyer may pay for the `offer` side of a listing: the need ceiling (`maxUnitValue` × the units it still needs, at most the listing quantity), never above the
+ * listed value. Without a matching need: `minAcceptBps` of the listed value. A-AG-01/02: every path that makes a bid or accepts a counter uses this one number.
+ */
+export function buyerCeiling(policy: BarterPolicy, side: Pick<Listing["offer"], "asset_type" | "quantity" | "value">): bigint {
+  const listed = BigInt(side.value);
+  const need = policy.needs.find((n) => n.assetType === side.asset_type);
+  const ceiling = need ? BigInt(need.maxUnitValue) * BigInt(Math.min(need.quantity, side.quantity)) : bps(listed, policy.minAcceptBps);
+  return ceiling < listed ? ceiling : listed;
+}
+
+/** The most units the buyer may ask for on this listing: what it still needs, at most the listing quantity. 0 without a matching need. */
+export function buyerQuantityCap(policy: BarterPolicy, side: Pick<Listing["offer"], "asset_type" | "quantity">): number {
+  const need = policy.needs.find((n) => n.assetType === side.asset_type);
+  return need ? Math.min(need.quantity, side.quantity) : 0;
+}
+
 /** Base rule. Seller: accept above the floor, reject below the lower bound, otherwise counter downward from the listing price each round. */
 export function decideRule(ctx: DecisionContext): Decision {
   const { listing, offer, policy } = ctx;
@@ -97,9 +114,7 @@ export function decideRule(ctx: DecisionContext): Decision {
   }
 
   // The bidder judges the seller's counter-offer: accept if it does not exceed the need ceiling.
-  const need = policy.needs.find((n) => n.assetType === listing.offer.asset_type);
-  const ceiling = need ? BigInt(need.maxUnitValue) * BigInt(Math.min(need.quantity, listing.offer.quantity)) : bps(listed, policy.minAcceptBps);
-  const cap = ceiling < listed ? ceiling : listed;
+  const cap = buyerCeiling(policy, listing.offer);
   if (value <= cap) return { action: "accept" };
   if (offer.round >= policy.maxRounds) return { action: "reject", reason: "max_rounds" };
   const last = ctx.ownLastValue ? BigInt(ctx.ownLastValue) : bps(listed, policy.openingBps);
@@ -118,7 +133,7 @@ function validAgainstPolicy(decision: Decision, ctx: DecisionContext): boolean {
   }
   if (!/^[1-9]\d*$/.test(decision.value)) return false;
   const value = BigInt(decision.value);
-  return ctx.role === "seller" ? value >= bps(listed, ctx.policy.minAcceptBps) && value <= listed : value > 0n && value <= listed;
+  return ctx.role === "seller" ? value >= bps(listed, ctx.policy.minAcceptBps) && value <= listed : value > 0n && value <= buyerCeiling(ctx.policy, ctx.listing.offer);
 }
 
 /** The live LLM decision if valid under the policy; otherwise the base rule. */
@@ -273,7 +288,11 @@ export class PolicyAgent {
     for (const referral of await this.book.referralInbox(this.identity.accountId)) {
       const view = open.find((l) => l.listingHash === referral.listingHash);
       const fit = view ? matchesPolicy(view, this.identity.accountId, this.policy) : null;
-      const reason = !this.policy.acceptReferrals ? "not_opted_in" : !view ? "listing_gone" : fit === null ? "no_need" : referral.mode === "barter" && fit !== "barter" ? "no_goods" : undefined;
+      const side = view ? { asset_type: view.offer.assetType, quantity: view.offer.quantity, value: view.offer.value } : undefined;
+      // A-AG-01: the seeker's value and quantity are not trusted: above the owner's ceiling, or more units than the owner needs, the referral is refused
+      const reason = !this.policy.acceptReferrals ? "not_opted_in" : !view ? "listing_gone" : fit === null ? "no_need" : referral.mode === "barter" && fit !== "barter" ? "no_goods"
+        : !/^[1-9]\d*$/.test(referral.value) || BigInt(referral.value) > buyerCeiling(this.policy, side!) ? "over_ceiling"
+        : !Number.isInteger(referral.quantity) || referral.quantity < 1 || referral.quantity > buyerQuantityCap(this.policy, side!) ? "quantity_over_need" : undefined;
       if (reason !== undefined) {
         await this.book.refuseReferral(referral.referralHash, signRefuseReferral(referral.referralHash, this.#contractId, this.identity.voucherSecretKey));
         answers.push({ referralHash: referral.referralHash, action: "refused", reason });
@@ -308,6 +327,10 @@ export class PolicyAgent {
    * that opted in call this; the offer is signed by the agent itself.
    */
   async bidFromReferral(plan: { listing: ListingView; mode: "pay" | "barter"; value: string; quantity: number }): Promise<StepResult> {
+    // A-AG-01: the plan comes from a seeker; the same ceilings as `shop()` and `handleReferrals()` apply
+    const side = { asset_type: plan.listing.offer.assetType, quantity: plan.listing.offer.quantity, value: plan.listing.offer.value };
+    if (!/^[1-9]\d*$/.test(plan.value) || BigInt(plan.value) > buyerCeiling(this.policy, side)) throw new Error("bid_over_ceiling: the value is above the need ceiling of the owner");
+    if (!Number.isInteger(plan.quantity) || plan.quantity < 1 || plan.quantity > buyerQuantityCap(this.policy, side)) throw new Error("bid_quantity_over_need: more units than the owner needs");
     const offer = await this.#postOffer(plan.listing, 1, plan.mode, plan.value, plan.quantity);
     return { kind: "bid", listingHash: plan.listing.listingHash, offerHash: offer.offerHash, mode: plan.mode, value: plan.value };
   }
@@ -396,6 +419,45 @@ export class PolicyAgent {
     const preview = await this.book.previewAccept(listingHashHex, offerHashHex, { account, ...seeker });
     if (!preview.bundle) return this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch, ...seeker });
     if (termsHash(preview.bundle.terms) !== preview.bundle.termsHash) throw new Error("terms_hash from the server does not match the bundle terms");
+    // A-AG-03: the backend is not trusted with payer, payee and amounts: sign only the bundle that the local `planOffer` gives for this listing and this offer
+    const view = (await this.book.listings({ status: "all" })).find((l) => l.listingHash === listingHashHex);
+    const accepted = (await this.book.offersOf(listingHashHex)).find((o) => o.offerHash === offerHashHex);
+    if (!view || !accepted) throw new Error("bundle_not_verified: the listing or the offer is not in the book");
+    const offer: Offer = {
+      circle: this.#contractId, listing_hash: view.listingHash, proposer: accepted.proposer, round: accepted.round, mode: accepted.mode,
+      value: accepted.value, quantity: accepted.quantity, deliver_by: Math.floor(Date.parse(accepted.deliverBy) / 1000),
+    };
+    // The backend may know a referral that this call did not name (the offer cites it): the searcher is then the payee of the bundle that is neither the seller nor the counterparty.
+    // Its share must come out of the discount of the listing (never above `discount_bps`) and must reproduce the same terms hash through the local `planOffer`.
+    const listing = this.#toListing(view);
+    const others = [...new Set(preview.bundle.terms.legs.map((l) => l.payee))].filter((p) => p !== view.account && p !== accepted.counterparty);
+    const searcher = referral?.searcher ?? (others.length === 1 ? others[0] : undefined);
+    const shares: number[] = [];
+    if (referral) shares.push(referral.searcherShareBps);
+    else if (searcher !== undefined) {
+      const leg = preview.bundle.terms.legs.find((l) => l.payee === searcher);
+      for (const denominator of [BigInt(accepted.value), BigInt(view.offer.value)]) {
+        const base = leg ? Number((BigInt(leg.max_amount) * BPS) / denominator) : 0;
+        shares.push(base, base + 1);
+      }
+    } else shares.push(0);
+    let why = "the legs of the server do not match the listing and the offer";
+    let matched = false;
+    if (others.length <= 1) {
+      for (const share of shares) {
+        if (searcher !== undefined && share > view.discountBps) continue;
+        try {
+          const plan = planOffer({ listing, offer, epoch: preview.epoch, counterparty: accepted.counterparty, ...(searcher === undefined ? {} : { searcher, searcherShareBps: share }) });
+          if (plan.kind === "bundle" && plan.terms_hash === preview.bundle.termsHash) {
+            matched = true;
+            break;
+          }
+        } catch (error) {
+          why = `the local plan fails: ${error instanceof Error ? error.message : String(error)}`;
+        }
+      }
+    } else why = "the bundle pays more than one party besides the seller and the counterparty";
+    if (!matched) throw new Error(`bundle_differs_from_local_plan: ${why}; not signed`);
     const { signature } = signBundle(preview.bundle.terms, account, this.identity.voucherSecretKey);
     return this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch, signature, ...seeker });
   }
