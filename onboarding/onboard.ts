@@ -39,6 +39,10 @@ export async function onboardAgents(options: OnboardOptions): Promise<OnboardOut
     const stored = loadIdentity(options.keysDir, options.network, agent.accountId);
     const member = (await options.view("member", { account_id: agent.accountId })) as { status: string; pubkey_voucher?: string } | null;
     if (member?.status === "active" && stored) {
+      // A-AG-17: an active member with another voucher key than the saved one is not this identity; reusing the file would sign vouchers the contract rejects
+      if (member.pubkey_voucher !== undefined && member.pubkey_voucher !== stored.voucherPublicKey) {
+        throw new Error(`${agent.accountId} is active with another voucher key than the saved one; the key file does not belong to this member`);
+      }
       log(`${agent.accountId}: already active`);
       outcomes.push({ identity: stored, status: "already_active" });
       continue;

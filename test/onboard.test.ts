@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { chmodSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -92,5 +92,31 @@ describe("AG-004 onboarding", () => {
     expect(again.map((o) => o.status)).toEqual(Array(6).fill("already_active"));
     expect(sent).toHaveLength(0);
     void buildJoinCall;
+  });
+
+  it("TC-AG-042-01 an active member whose voucher key is not the saved one is refused, not reused (A-AG-17)", async () => {
+    const dir = tmp();
+    const mine = generateVoucherKeypair();
+    const other = generateVoucherKeypair();
+    saveIdentity(dir, "sandbox", { accountId: "a.test.near", voucherSecretKey: mine.secretKey, voucherPublicKey: mine.publicKey, policy: POLICY });
+    const run = (onChain: string) =>
+      onboardAgents({
+        agents: [{ accountId: "a.test.near", sendCall: vi.fn() }], circleContract: CIRCLE, circleId: "agents-main", termsHash: "a".repeat(64), stakeAmount: "50000000",
+        policy: POLICY, keysDir: dir, network: "sandbox", pollIntervalMs: 1, timeoutMs: 1000,
+        view: async (method) => (method === "member" ? { status: "active", stake: "1", limit: "1", pubkey_voucher: onChain } : null),
+      });
+    await expect(run(other.publicKey)).rejects.toThrow(/another voucher key than the saved one/);
+    expect((await run(mine.publicKey)).map((o) => o.status)).toEqual(["already_active"]);
+  });
+
+  it("TC-AG-042-02 saving a key leaves no temporary file behind and replaces an older file", () => {
+    const dir = tmp();
+    const a = generateVoucherKeypair();
+    const b = generateVoucherKeypair();
+    saveIdentity(dir, "sandbox", { accountId: "a.test.near", voucherSecretKey: a.secretKey, voucherPublicKey: a.publicKey, policy: POLICY });
+    const file = saveIdentity(dir, "sandbox", { accountId: "a.test.near", voucherSecretKey: b.secretKey, voucherPublicKey: b.publicKey, policy: POLICY });
+    expect(readdirSync(join(dir, "sandbox"))).toEqual(["a.test.near.agent.json"]);
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect(loadIdentity(dir, "sandbox", "a.test.near")).toMatchObject({ voucherPublicKey: b.publicKey });
   });
 });

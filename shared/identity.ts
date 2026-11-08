@@ -1,6 +1,6 @@
 // Agent identity: ed25519 voucher key (ADR-06, not a NEAR access key) and the owner spend policy (FX-AG-4).
 // Stored per account at <keysDir>/<network>/<account>.agent.json with mode 0600; the secret is never printed.
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 /** Spend limits in credit smallest units (6 decimals), decimal string. */
@@ -45,8 +45,11 @@ export function saveIdentity(keysDir: string, network: string, identity: AgentId
   const file = identityPath(keysDir, network, identity.accountId);
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   chmodSync(dirname(file), 0o700); // also a directory that already existed with wider bits (F8, review BE-063)
-  writeFileSync(file, JSON.stringify(identity, null, 2), { mode: 0o600 });
-  chmodSync(file, 0o600);
+  // A-AG-17: write a temporary file and rename it, so a crash never leaves a half-written key file under the real name
+  const temporary = `${file}.${process.pid}.tmp`;
+  writeFileSync(temporary, JSON.stringify(identity, null, 2), { mode: 0o600 });
+  chmodSync(temporary, 0o600);
+  renameSync(temporary, file);
   return file;
 }
 
