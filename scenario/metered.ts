@@ -34,16 +34,22 @@ export type MeteredOutcome = {
   seq: number;
 };
 
-export async function runMeteredScenario(args: { circle: string; epoch: number; buyer: string; seller: string; buyerKey: VoucherSecretKey }): Promise<MeteredOutcome> {
+export async function runMeteredScenario(args: { circle: string; epoch: number; buyer: string; seller: string; buyerKey: VoucherSecretKey; maxPerEpoch?: string }): Promise<MeteredOutcome> {
   const { circle, epoch, buyer, seller, buyerKey } = args;
+  // AG-046: the owner's epoch limit (atomic units) also binds this scenario; the buyer signs nothing that would take the cumulative of the epoch above it. No limit: as before.
+  const ownerLimit = args.maxPerEpoch === undefined ? null : BigInt(args.maxPerEpoch);
+  const overLimit = (next: bigint): boolean => ownerLimit !== null && cumulative + next > ownerLimit;
   const vouchers: Voucher[] = [];
   let cumulative = 0n;
   let seq = 0;
+  let feedCalls = 0;
 
   // 1. data feed per call: each call one voucher for the amount the seller announces
   const feed = createMeteredEndpoint({ kind: "data-feed", unitPrice: "$0.002", handler: () => new Response("price: 42") });
   for (let call = 1; call <= FEED_CALLS; call++) {
     const { amount } = await resolvePrice(feed.route.price, new Request("https://compute.example/api/feed?quantity=1"), feed.route.maxQuantity);
+    if (overLimit(BigInt(amount))) break;
+    feedCalls += 1;
     cumulative += BigInt(amount);
     seq += 1;
     vouchers.push(signVoucher({ circle, payer: buyer, payee: seller, epoch, seq, cumulativeAmount: cumulative.toString(), unit: "credit", resource: `feed:${feed.assetType}` }, buyerKey));
@@ -61,7 +67,7 @@ export async function runMeteredScenario(args: { circle: string; epoch: number; 
     const sellerSide = new SellerJob(budget);
     for (let guard = 0; guard < 100; guard++) {
       const pay = buyerSide.nextChunk();
-      if (pay !== null && !(stoppedBy === "buyer" && pay > limit)) {
+      if (pay !== null && !(stoppedBy === "buyer" && pay > limit) && !overLimit(BigInt(buyerSide.summary().cumulativeSigned) + budget.chunkAmount)) { // `cumulative` moves only when the job ends: add what this job signed so far
         const signed = buyerSide.signNext(buyerKey);
         vouchers.push(signed.voucher);
         sellerSide.accept(signed.voucher);
@@ -87,7 +93,7 @@ export async function runMeteredScenario(args: { circle: string; epoch: number; 
   runJob("render-3", "seller", 2);
 
   return {
-    feed: { calls: FEED_CALLS, paid: feedPaid.toString(), unit: feed.unit, unitPrice: feed.unitPriceAtomic },
+    feed: { calls: feedCalls, paid: feedPaid.toString(), unit: feed.unit, unitPrice: feed.unitPriceAtomic },
     jobs, vouchers, cumulative: cumulative.toString(), seq,
   };
 }

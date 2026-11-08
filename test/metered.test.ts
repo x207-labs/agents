@@ -41,3 +41,23 @@ describe("AG-024 metered resources: a CPU job in chunks and a data feed per call
     expect(verifyOutcome({ ...o, vouchers: o.vouchers.map((v, i) => (i === 3 ? { ...v, cumulativeAmount: "1" } : v)) }, BUYER, key.secretKey)).toBe(false);
   });
 });
+
+describe("AG-046 the owner's epoch limit binds the metered scenario", () => {
+  const limited = (maxPerEpoch?: string) => runMeteredScenario({ circle: CIRCLE, epoch: 42, buyer: BUYER, seller: SELLER, buyerKey: key.secretKey, ...(maxPerEpoch === undefined ? {} : { maxPerEpoch }) });
+
+  it("TC-AG-046-13 with a limit of 3 credit the buyer signs nothing above it: the feed is paid (20000), two chunks of the first job are paid, nothing after", async () => {
+    const o = await limited("3000000");
+    expect(BigInt(o.cumulative)).toBeLessThanOrEqual(3_000_000n);
+    expect(o.cumulative).toBe("2020000");
+    expect(o.feed).toMatchObject({ calls: FEED_CALLS, paid: "20000" });
+    expect(o.jobs.map((j) => j.paid)).toEqual(["2000000", "0", "0"]);
+    expect(verifyOutcome(o, BUYER, key.secretKey)).toBe(true);
+  });
+
+  it("TC-AG-046-14 a limit below the price of the feed stops the feed before the first call; without a limit nothing changes", async () => {
+    const tiny = await limited("3999");
+    expect(tiny.feed.calls).toBe(1);
+    expect(tiny.cumulative).toBe("2000");
+    expect((await limited()).cumulative).toBe((await run()).cumulative);
+  });
+});
