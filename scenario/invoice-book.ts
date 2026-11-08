@@ -76,7 +76,7 @@ export class InvoiceBook {
   }
 
   /** The debtor approves: checks the hash and schedule against the SDK plan, then signs all installment vouchers at once (seq 1 in its epoch). */
-  async approve(hash: string, debtor: InvoiceActor): Promise<InvoiceState> {
+  async approve(hash: string, debtor: InvoiceActor, limits: { maxPerCall?: string; maxPerEpoch?: string } = {}): Promise<InvoiceState> {
     const view = await this.get(hash);
     if (invoiceHash(view.document) !== view.invoiceHash) throw new Error("invoice hash does not match its document: not signed");
     const first = view.installments[0];
@@ -84,6 +84,11 @@ export class InvoiceBook {
     const plan = planInstallments({ circle: this.contract, doc: view.document, firstEpoch: first.epoch, count: view.installments.length });
     const same = plan.installments.every((p, k) => view.installments[k]?.epoch === p.epoch && view.installments[k]?.amount === p.amount);
     if (!same) throw new Error("the schedule from the book differs from the SDK plan: not signed");
+    // A-AG-10: the owner limits also hold for an invoice; each installment is one voucher in its own epoch
+    for (const p of plan.installments) {
+      if (limits.maxPerCall !== undefined && BigInt(p.amount) > BigInt(limits.maxPerCall)) throw new Error(`installment ${p.index} of ${p.amount} is above the owner limit per call ${limits.maxPerCall}: not signed`);
+      if (limits.maxPerEpoch !== undefined && BigInt(p.amount) > BigInt(limits.maxPerEpoch)) throw new Error(`installment ${p.index} of ${p.amount} is above the owner limit per epoch ${limits.maxPerEpoch}: not signed`);
+    }
     const vouchers = plan.installments.map((p) => {
       const voucher = installmentVoucher(plan, p.index);
       return { voucher, signature: signVoucher(voucher, debtor.secretKey).signature };

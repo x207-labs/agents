@@ -60,6 +60,7 @@ export class ProcurementAgent {
   readonly #pay: typeof fetch;
   readonly #quote: typeof fetch;
   #spent = 0n;
+  #tail: Promise<void> = Promise.resolve();
   readonly log: Purchase[] = [];
 
   constructor(options: ProcurementOptions) {
@@ -86,12 +87,20 @@ export class ProcurementAgent {
   }
 
   /** Buy one `service` call with `input` if all owner limits pass. */
-  async buy(service: string, input: string): Promise<Purchase> {
+  buy(service: string, input: string): Promise<Purchase> {
+    // A-AG-11: one purchase at a time, so the budget check and the spent counter see each other (concurrent calls could all pass the check and overshoot the epoch budget)
+    const run = this.#tail.then(() => this.#buy(service, input));
+    this.#tail = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
+  async #buy(service: string, input: string): Promise<Purchase> {
     const listed = this.policy.services.find((s) => s.name === service);
     if (!listed) return this.#deny(service, "service_not_allowed");
     const target = `${listed.url}${listed.path}?input=${encodeURIComponent(input)}`;
 
-    const price = await readQuote(await this.#quote(target));
+    // no redirect is followed: the payment header would go to the target of the redirect (A-AG-11)
+    const price = await readQuote(await this.#quote(target, { redirect: "manual" }));
     if (price === null) return this.#deny(service, "quote_unavailable");
     const amount = BigInt(price);
     if (amount > BigInt(listed.maxPrice)) return this.#deny(service, "price_above_service_limit", { price, limit: listed.maxPrice });
@@ -100,7 +109,7 @@ export class ProcurementAgent {
       return this.#deny(service, "over_epoch_budget", { price, spent: this.#spent.toString(), limit: this.policy.spend.maxPerEpoch });
     }
 
-    const response = await this.#pay(target);
+    const response = await this.#pay(target, { redirect: "manual" });
     if (response.status !== 200) return this.#deny(service, "quote_unavailable", { status: String(response.status) });
     this.#spent += amount;
     const result: Purchase = {

@@ -65,6 +65,24 @@ describe("AG-020 procurement agent within budget", () => {
     expect(agent.spent).toBe(0n);
   });
 
+  it("TC-AG-046-01 purchases that run at the same time cannot overshoot the epoch budget, and no redirect is followed (A-AG-11)", async () => {
+    const m = market({ "/api/translate": "30000" });
+    const seen: Array<RequestInit | undefined> = [];
+    const slowPay = (async (input: string | URL | Request, init?: RequestInit) => {
+      seen.push(init);
+      await new Promise((r) => setTimeout(r, 10));
+      return m.pay(input, init);
+    }) as typeof fetch;
+    const agent = new ProcurementAgent({ account: "gpu.x207-circle.near", policy: policy({ maxPerEpoch: "80000" }), pay: slowPay, quote: m.quote });
+    const results = await Promise.all(Array.from({ length: 4 }, () => agent.buy("translate", "hello")));
+    expect(results.filter((r) => r.ok)).toHaveLength(2);
+    expect(agent.spent).toBe(60_000n);
+    expect(seen.every((init) => init?.redirect === "manual")).toBe(true);
+    const redirect = (async () => new Response(null, { status: 302, headers: { location: "http://elsewhere.test/" } })) as typeof fetch;
+    const other = new ProcurementAgent({ account: "gpu.x207-circle.near", policy: policy(), pay: m.pay, quote: redirect });
+    expect(await other.buy("translate", "hello")).toMatchObject({ ok: false, reason: "quote_unavailable" });
+  });
+
   it("TC-AG-020-04 epoch budget used up: the next purchase is rejected; a new epoch restores the budget", async () => {
     const m = market({ "/api/translate": "30000" });
     const agent = new ProcurementAgent({ account: "gpu.x207-circle.near", policy: policy({ maxPerEpoch: "80000" }), pay: m.pay, quote: m.quote });

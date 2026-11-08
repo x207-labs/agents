@@ -60,6 +60,16 @@ describe.skipIf(!BACKEND_AVAILABLE)("AG-025 invoice and installments through the
     expect((await book.list(acct("maker"), "registered")).items.map((i) => i.invoiceHash)).toEqual([requested.invoiceHash]);
   });
 
+  it("TC-AG-046-02 the debtor does not sign installments above its owner limit (A-AG-10)", async () => {
+    const { book, actor, doc } = await start();
+    const d = doc("supplier", "maker");
+    const requested = await book.request(d, 3, actor("supplier")); // three installments of 30 credits
+    await expect(book.approve(requested.invoiceHash, actor("maker"), { maxPerCall: credit(20) })).rejects.toThrow(/above the owner limit per call/);
+    await expect(book.approve(requested.invoiceHash, actor("maker"), { maxPerEpoch: credit(20) })).rejects.toThrow(/above the owner limit per epoch/);
+    expect((await book.get(requested.invoiceHash)).status).toBe("requested"); // nothing was posted
+    expect((await book.approve(requested.invoiceHash, actor("maker"), { maxPerCall: credit(30), maxPerEpoch: credit(30) })).status).toBe("approved");
+  });
+
   it("TC-AG-025-02 an invoice that the debtor rejects is not paid: the reason is kept, and it cannot be approved afterwards", async () => {
     const { book, actor, doc } = await start();
     const d = doc("retailer", "supplier", { id: "INV-2026-002", amount: credit(60) });
