@@ -7,7 +7,9 @@
 import { createHash } from "node:crypto";
 import { checkAccountLockBeforePay, signVoucher, type AccountId, type AccountLockReason, type ContractCall } from "@x207/core";
 
-export type Send = (account: AccountId, call: ContractCall & { gas?: bigint }) => Promise<{ failures: string[]; logs: string[]; value: unknown }>;
+export type Send = (account: AccountId, call: ContractCall & { gas?: bigint }) => Promise<{ failures: string[]; logs: string[]; value: unknown; hash?: string }>;
+/** Where a run writes its trace: one line per step with the state it saw, so that a failure leaves more than the first failed assertion. Set by the test; absent in other uses. */
+export type Trace = (line: string) => void;
 export type AccountSaleStep = { item: string; step: string; ok: boolean; detail: string };
 
 export type AccountSaleWorld = {
@@ -32,6 +34,7 @@ export type AccountSaleWorld = {
   keysOf: (account: AccountId) => Promise<string[]>;
   /** Close, commit and finalize the open epoch, so that the next one is open. */
   nextEpoch: () => Promise<void>;
+  trace?: Trace;
 };
 
 const PRICE = "1000000";
@@ -95,7 +98,7 @@ async function offer(w: AccountSaleWorld, assetType: string): Promise<number> {
 /**
  * What an agent does before paying for an account: the pre-pay check of the SDK, and the payment only if it passes. Returns the reasons when it does not, and then sends nothing.
  */
-export async function payIfSafe(w: AccountSaleWorld, grantId: number, waitSeconds = 0): Promise<{ paid: false; reasons: AccountLockReason[] } | { paid: true; failures: string[] }> {
+export async function payIfSafe(w: AccountSaleWorld, grantId: number, waitSeconds = 0, trace: Trace = () => {}): Promise<{ paid: false; reasons: AccountLockReason[] } | { paid: true; failures: string[] }> {
   // The check reads the chain at final finality, which trails the lock by a few blocks: right after the lock it can still say `locker_not_held`. A buyer asks again; `waitSeconds` is that.
   const deadline = Date.now() + waitSeconds * 1000;
   let check = await checkAccountLockBeforePay({ circle: w.circle, grantId, soldAccount: w.sold, rpcUrls: [w.rpcUrl], circleView: (method, args) => w.view(w.circle, method, args ?? {}) });
@@ -103,6 +106,7 @@ export async function payIfSafe(w: AccountSaleWorld, grantId: number, waitSecond
     await new Promise((r) => setTimeout(r, 1000));
     check = await checkAccountLockBeforePay({ circle: w.circle, grantId, soldAccount: w.sold, rpcUrls: [w.rpcUrl], circleView: (method, args) => w.view(w.circle, method, args ?? {}) });
   }
+  trace(`pre-pay check of grant ${grantId}: ${check.ok ? "ok" : `refused ${check.reasons.join(",")}`}`);
   if (!check.ok) return { paid: false, reasons: check.reasons };
   const epoch = Number(((await w.view(w.circle, "get_epoch", {})) as { epoch: number }).epoch);
   seq += 1;
@@ -111,6 +115,7 @@ export async function payIfSafe(w: AccountSaleWorld, grantId: number, waitSecond
     w.buyerVoucherKey,
   );
   const bought = await w.send(w.buyer, { receiverId: w.circle, methodName: "complete_account_escrow", args: { grant_id: grantId, voucher, signature, delivery_pubkey: w.deliveryKey }, deposit: 0n, gas: 250_000_000_000_000n });
+  trace(`complete_account_escrow grant ${grantId} at epoch ${epoch}: tx ${bought.hash ?? "?"} failures ${JSON.stringify(bought.failures)} logs ${JSON.stringify(bought.logs)}`);
   return { paid: true, failures: bought.failures };
 }
 
@@ -120,7 +125,7 @@ const lockerState = async (w: AccountSaleWorld): Promise<string> => String(((awa
 /** Item #11 (and the on-chain part of #12): offer, a refused pre-pay check on an account that is not locked, the lock, a passing check, the payment, the only key. */
 export async function runNamedAccountSale(w: AccountSaleWorld, item = "11"): Promise<AccountSaleStep[]> {
   const steps: AccountSaleStep[] = [];
-  const note = (step: string, ok: boolean, detail: string) => steps.push({ item, step, ok, detail });
+  const note = (step: string, ok: boolean, detail: string) => { steps.push({ item, step, ok, detail }); w.trace?.(`#${item} ${ok ? "ok  " : "FAIL"} ${step} :: ${detail}`); };
   const id = await offer(w, "near:account");
   note("offer_grant", id >= 0, `grant ${id}`);
 
@@ -131,7 +136,7 @@ export async function runNamedAccountSale(w: AccountSaleWorld, item = "11"): Pro
   const keys = await w.keysOf(w.sold);
   note("lock", locked.failures.length === 0 && keys.length === 0 && (await lockerState(w)) === "held" && (await escrowState(w, id)) === "held", `keys ${keys.length}, locker ${await lockerState(w).catch(() => "none")}, escrow ${await escrowState(w, id)}`);
 
-  const paid = await payIfSafe(w, id, 60);
+  const paid = await payIfSafe(w, id, 60, w.trace);
   const after = await w.keysOf(w.sold);
   note("pay after a passing check", paid.paid && paid.failures.length === 0 && (await escrowState(w, id)) === "delivered" && (await lockerState(w)) === "released" && after.length === 1 && after[0] === w.deliveryKey,
     paid.paid ? `escrow ${await escrowState(w, id)}, locker ${await lockerState(w)}, keys ${after.length}` : paid.reasons.join(","));
@@ -141,21 +146,39 @@ export async function runNamedAccountSale(w: AccountSaleWorld, item = "11"): Pro
 /** Item #14: the sold account is a member. The check passes, the payment is refused in the epoch of the lock, and goes through after one epoch with the voucher key rotated. */
 export async function runMemberAccountSale(w: AccountSaleWorld): Promise<AccountSaleStep[]> {
   const steps: AccountSaleStep[] = [];
-  const note = (step: string, ok: boolean, detail: string) => steps.push({ item: "14", step, ok, detail });
+  const t = w.trace ?? (() => {});
+  // every step is written to the trace the moment it is known, with the whole state (not cut), so that a later throw cannot hide it
+  const note = (step: string, ok: boolean, detail: string) => { steps.push({ item: "14", step, ok, detail }); t(`#14 ${ok ? "ok  " : "FAIL"} ${step} :: ${detail}`); };
+  let gid = -1;
+  const snapshot = async (label: string) => {
+    const [escrow, member, keys, epoch] = await Promise.all([
+      w.view(w.circle, "get_account_escrow", { grant_id: gid }).catch(() => "n/a"),
+      w.view(w.circle, "member", { account_id: w.sold }).catch((e: unknown) => `error ${(e as Error).message}`),
+      w.keysOf(w.sold).catch(() => ["error"]),
+      w.view(w.circle, "get_epoch", {}).catch(() => null),
+    ]);
+    t(`#14 state ${label}: epoch ${JSON.stringify(epoch)} member ${JSON.stringify(member)} keys ${JSON.stringify(keys)} (escrow of grant ${gid} ${JSON.stringify(escrow)})`);
+  };
   const id = await offer(w, "near:member_account");
+  gid = id;
   note("offer_grant", id >= 0, `grant ${id}`);
   const locked = await w.lock(id, w.returnKey);
-  note("lock", locked.failures.length === 0 && (await escrowState(w, id)) === "held", `escrow ${await escrowState(w, id)}`);
+  note("lock", locked.failures.length === 0 && (await escrowState(w, id)) === "held", `failures ${JSON.stringify(locked.failures)}; escrow ${await escrowState(w, id)}`);
+  await snapshot("after lock");
 
-  const same = await payIfSafe(w, id, 60);
+  const same = await payIfSafe(w, id, 60, t);
   const refused = same.paid && same.failures.some((f) => f.includes("ERR_ESCROW_EPOCH_WAIT"));
-  note("same epoch is refused (ERR_ESCROW_EPOCH_WAIT) and the account keeps no key", refused && (await w.keysOf(w.sold)).length === 0 && (await escrowState(w, id)) === "held", same.paid ? same.failures.join("; ").slice(0, 120) : same.reasons.join(","));
+  note("same epoch is refused (ERR_ESCROW_EPOCH_WAIT) and the account keeps no key", refused && (await w.keysOf(w.sold)).length === 0 && (await escrowState(w, id)) === "held",
+    same.paid ? `failures ${JSON.stringify(same.failures)}; keys ${(await w.keysOf(w.sold)).length}; escrow ${await escrowState(w, id)}` : `check refused: ${same.reasons.join(",")}`);
+  await snapshot("after the refused payment");
 
   await w.nextEpoch();
-  const paid = await payIfSafe(w, id, 60);
+  await snapshot("after nextEpoch");
+  const paid = await payIfSafe(w, id, 60, t);
   const member = (await w.view(w.circle, "member", { account_id: w.sold })) as { pubkey_voucher?: string } | null;
   const keys = await w.keysOf(w.sold);
   note("pay after one epoch: only key and voucher key are the buyer's", paid.paid && paid.failures.length === 0 && keys.length === 1 && keys[0] === w.deliveryKey && member?.pubkey_voucher === w.deliveryKey,
-    paid.paid ? `keys ${keys.length}, voucher key rotated ${member?.pubkey_voucher === w.deliveryKey}, failures ${paid.failures.join("; ").slice(0, 100)}` : paid.reasons.join(","));
+    paid.paid ? `failures ${JSON.stringify(paid.failures)}; keys ${JSON.stringify(keys)} (delivery ${w.deliveryKey}); member voucher key ${member?.pubkey_voucher}; escrow ${await escrowState(w, id)}` : `check refused: ${paid.reasons.join(",")}`);
+  await snapshot("end");
   return steps;
 }

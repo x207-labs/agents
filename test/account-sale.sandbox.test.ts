@@ -1,7 +1,9 @@
 // AG-050 in near-sandbox (P1, contract 0.0.18): the sale of a NEAR account through the locker, items #11 and #14, with the SDK pre-pay check of SD-119 in front of every payment.
 // Needs the 0.0.18 circle wasm (`cargo near build non-reproducible-wasm` on the branch p1-0.0.18 of contracts) and the locker wasm (`... --manifest-path locker/Cargo.toml`), and the
 // SD-119 build of @x207/core. Run: X207_SANDBOX=1 npx vitest run test/account-sale.sandbox.test.ts
-import { existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join as joinPath } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
@@ -30,6 +32,14 @@ describe.skipIf(!ready)("AG-050 sale of a NEAR account in near-sandbox", () => {
     // an epoch long enough for joining and the sale of #11 (a payment is refused in the last 120 s before the cutoff), short enough to fast-forward in 500-block steps
     fx = await deployCircle({ ...SHORT_PARAMS, epoch_length: 1_800 });
     const sandbox = fx.sandbox;
+    // a trace of every step, to the console and to a file (X207_TRACE, default in the temp folder), so that a failure leaves the step, the tx hash and the contract's error text
+    const traceFile = process.env.X207_TRACE ?? joinPath(tmpdir(), "ag050-trace.log");
+    const trace = (line: string) => {
+      const text = `${new Date().toISOString()} ${line}`;
+      console.log(text);
+      try { appendFileSync(traceFile, `${text}\n`); } catch { /* the trace is a help, not a result */ }
+    };
+    trace(`--- AG-050 run, epoch_length 1800, trace file ${traceFile}`);
     const dao = await sandbox.createAccount("dao", "10");
     const view = createCircleViewFn({ circleContract: fx.circle.accountId, rpcUrls: [sandbox.rpcUrl] });
     const join = async (name: string) => {
@@ -61,8 +71,10 @@ describe.skipIf(!ready)("AG-050 sale of a NEAR account in near-sandbox", () => {
         sold: sold.accountId, returnKey, deliveryKey: delivery, rpcUrl: sandbox.rpcUrl,
         send: async (account, call) => {
           const r = await accounts.get(account)!.call({ ...call, deposit: call.deposit ?? 0n }, "FINAL"); // the delivery has callbacks: wait for all receipts
-          return { failures: r.failures, logs: r.logs, value: r.value };
+          trace(`send ${account} -> ${call.receiverId}.${call.methodName}: tx ${r.hash} failures ${JSON.stringify(r.failures)}`);
+          return { failures: r.failures, logs: r.logs, value: r.value, hash: r.hash };
         },
+        trace,
         view: (contractId, method, args) => sandbox.view(contractId, method, args),
         nowNs: async () => BigInt(await sandbox.blockTimestampMs()) * 1_000_000n,
         lock: async (grantId, rk) => {
@@ -75,8 +87,10 @@ describe.skipIf(!ready)("AG-050 sale of a NEAR account in near-sandbox", () => {
           try {
             const raw = (await (sold.account as unknown as { signAndSendTransaction(t: object): Promise<{ receipts_outcome: Array<{ outcome: { status: unknown } }> }> }).signAndSendTransaction({ receiverId: sold.accountId, actions })) as { receipts_outcome: Array<{ outcome: { status: unknown } }> };
             const failed = raw.receipts_outcome.filter((o) => typeof o.outcome.status === "object" && o.outcome.status !== null && "Failure" in (o.outcome.status as object));
+            trace(`lock on ${sold.accountId} for grant ${grantId}: tx ${(raw as { transaction_outcome?: { id?: string } }).transaction_outcome?.id ?? "?"} failures ${JSON.stringify(failed.map((o) => o.outcome.status))}`);
             return { failures: failed.map((o) => JSON.stringify(o.outcome.status)) };
           } catch (error) {
+            trace(`lock on ${sold.accountId} for grant ${grantId}: threw ${(error as Error).message}`);
             return { failures: [(error as Error).message] };
           }
         },
@@ -89,6 +103,7 @@ describe.skipIf(!ready)("AG-050 sale of a NEAR account in near-sandbox", () => {
             if (at !== undefined) await sandbox.advanceTo(Number(BigInt(at) / 1_000_000n) + 1_000);
             await new Promise((r) => setTimeout(r, 2_000));
             const r = await keeper.sandbox.accountFrom(fx.circle.accountId, fx.circle.secretKey).call({ receiverId: fx.circle.accountId, methodName: method, args: { epoch }, deposit: 0n, gas: 200_000_000_000_000n }, "FINAL");
+            trace(`nextEpoch ${method}(${epoch}) after ${at ?? "now"}: tx ${r.hash} failures ${JSON.stringify(r.failures)} logs ${JSON.stringify(r.logs)}`);
             if (r.failures.length > 0) throw new Error(`${method}: ${r.failures.join("; ")}`);
           };
           const e = await epochOf();
@@ -102,9 +117,16 @@ describe.skipIf(!ready)("AG-050 sale of a NEAR account in near-sandbox", () => {
     // the official hash of the locker is what the chain shows as the code hash of a locked account
     await prepareRegistry({ circle: fx.circle.accountId, send: async (account, call) => { const r = await dao.call({ ...call, deposit: call.deposit ?? 0n }, "FINAL"); return { failures: r.failures, logs: r.logs, value: r.value }; } }, dao.accountId, lockerCodeHash(wasm));
 
+    // both items run, and every failed step is reported with its detail (the first failed assertion alone hid the rest in the third run)
     const named = await runNamedAccountSale(world(shop));
-    for (const s of named) expect(s, `#11 ${s.step}: ${s.detail}`).toMatchObject({ ok: true });
-    const member = await runMemberAccountSale(world(eve.account));
-    for (const s of member) expect(s, `#14 ${s.step}: ${s.detail}`).toMatchObject({ ok: true });
+    let member: Awaited<ReturnType<typeof runMemberAccountSale>> = [];
+    try {
+      member = await runMemberAccountSale(world(eve.account));
+    } catch (error) {
+      trace(`#14 threw ${(error as Error).stack ?? (error as Error).message}`);
+      throw error;
+    }
+    const failed = [...named, ...member].filter((s) => !s.ok).map((s) => `#${s.item} ${s.step}: ${s.detail}`);
+    expect(failed, `failed steps (trace in ${traceFile})`).toEqual([]);
   }, 1_800_000);
 });
