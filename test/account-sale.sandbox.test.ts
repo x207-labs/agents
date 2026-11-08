@@ -13,7 +13,8 @@ import { SHORT_PARAMS, TERMS_HASH, deployCircle, type CircleFixture } from "../.
 import { sandboxAvailable, type SandboxAccount } from "../../sdk/test-support/sandbox.ts";
 import { lockerCodeHash, prepareRegistry, runMemberAccountSale, runNamedAccountSale, type AccountSaleWorld } from "./account-sale-scenario.ts";
 
-const LOCKER_WASM = fileURLToPath(new URL("../../contracts/target/near/x207_locker/x207_locker.wasm", import.meta.url));
+// X207_LOCKER_WASM / X207_CIRCLE_WASM (the latter read by the SDK harness) point at wasm built somewhere else, e.g. in another worktree of contracts
+const LOCKER_WASM = process.env.X207_LOCKER_WASM ?? fileURLToPath(new URL("../../contracts/target/near/x207_locker/x207_locker.wasm", import.meta.url));
 const ready = sandboxAvailable && existsSync(LOCKER_WASM) && typeof (core as Record<string, unknown>).checkAccountLockBeforePay === "function";
 // the harness of the SDK uses its own near-api-js; take the same one for the actions of the lock
 const nearApi = createRequire(fileURLToPath(new URL("../../sdk/test-support/sandbox.ts", import.meta.url)))("near-api-js") as {
@@ -52,22 +53,25 @@ describe.skipIf(!ready)("AG-050 sale of a NEAR account in near-sandbox", () => {
     };
     const seller = await join("seller");
     const buyer = await join("buyer");
+    // #11 leaves this buyer owing 1 credit; nobody settles it, so finalize_epoch defaults it (member_defaulted) and it is no longer active in the next epoch (ERR_PAYER_NOT_ACTIVE,
+    // seen in the trace of the diagnosis run). #14 therefore has a buyer of its own, which owes nothing when the epoch turns.
+    const buyer2 = await join("buyer2");
     const shop = await sandbox.createAccount("shop", "10");
     const eve = await join("eve"); // a member that is sold (#14)
 
     const wasm = readFileSync(LOCKER_WASM);
-    const accounts = new Map<string, SandboxAccount>([[seller.account.accountId, seller.account], [buyer.account.accountId, buyer.account], [dao.accountId, dao]]);
+    const accounts = new Map<string, SandboxAccount>([[seller.account.accountId, seller.account], [buyer.account.accountId, buyer.account], [buyer2.account.accountId, buyer2.account], [dao.accountId, dao]]);
     const rpc = async (params: object): Promise<any> => {
       const r = await fetch(sandbox.rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: "x", method: "query", params }) });
       return ((await r.json()) as { result: unknown }).result;
     };
     const keysOf = async (id: string): Promise<string[]> => ((await rpc({ request_type: "view_access_key_list", finality: "optimistic", account_id: id })) as { keys: Array<{ public_key: string }> }).keys.map((k) => k.public_key);
 
-    const world = (sold: SandboxAccount): AccountSaleWorld => {
+    const world = (sold: SandboxAccount, who: typeof buyer): AccountSaleWorld => {
       const delivery = nearApi.KeyPair.fromRandom("ed25519").getPublicKey().toString();
       const returnKey = nearApi.KeyPair.fromRandom("ed25519").getPublicKey().toString();
       return {
-        circle: fx.circle.accountId, seller: seller.account.accountId, buyer: buyer.account.accountId, buyerVoucherKey: buyer.secretKey,
+        circle: fx.circle.accountId, seller: seller.account.accountId, buyer: who.account.accountId, buyerVoucherKey: who.secretKey,
         sold: sold.accountId, returnKey, deliveryKey: delivery, rpcUrl: sandbox.rpcUrl,
         send: async (account, call) => {
           const r = await accounts.get(account)!.call({ ...call, deposit: call.deposit ?? 0n }, "FINAL"); // the delivery has callbacks: wait for all receipts
@@ -118,10 +122,10 @@ describe.skipIf(!ready)("AG-050 sale of a NEAR account in near-sandbox", () => {
     await prepareRegistry({ circle: fx.circle.accountId, send: async (account, call) => { const r = await dao.call({ ...call, deposit: call.deposit ?? 0n }, "FINAL"); return { failures: r.failures, logs: r.logs, value: r.value }; } }, dao.accountId, lockerCodeHash(wasm));
 
     // both items run, and every failed step is reported with its detail (the first failed assertion alone hid the rest in the third run)
-    const named = await runNamedAccountSale(world(shop));
+    const named = await runNamedAccountSale(world(shop, buyer));
     let member: Awaited<ReturnType<typeof runMemberAccountSale>> = [];
     try {
-      member = await runMemberAccountSale(world(eve.account));
+      member = await runMemberAccountSale(world(eve.account, buyer2));
     } catch (error) {
       trace(`#14 threw ${(error as Error).stack ?? (error as Error).message}`);
       throw error;
