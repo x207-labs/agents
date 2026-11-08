@@ -38,6 +38,10 @@ Override a port with `<NAME>_PORT` (the agent name in capitals), for example `TR
 
 An agent listens on `127.0.0.1` (AG-038). `AGENT_HOST` picks another interface, but a free endpoint (no `FACILITATOR_URL`) with a live `NEARAI_API_KEY` refuses to start on a non-loopback host. The free endpoint answers at most 30 calls a minute per client (429) and refuses `input` above 4000 characters (413). The live client stops a call after `NEARAI_TIMEOUT_MS` (default 30000) and asks for at most `NEARAI_MAX_TOKENS` (default 1024) tokens.
 
+## Dependencies
+
+`@x207/core` and `@x207/scheme` are not installed from npm: the registry holds `@x207/core@0.0.2`, which carries contract ABI 0.0.15, while the contract in use is 0.0.17 (AG-040). The agents run inside the umbrella workspace (`x207-labs/x207`, `npm ci` at its root), where the packages are linked from `sdk/packages/`; the own `package-lock.json` of this folder pinned the registry copy and was removed. `test/core-abi.test.ts` fails if the resolved `@x207/core` is not the workspace one at ABI 0.0.17.
+
 ## Try it
 
 Needs Node 22.22.2 or newer. Without credits or a network, in mock mode (the agent has no paywall until `FACILITATOR_URL` is set, so the call below is free):
