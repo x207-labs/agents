@@ -308,7 +308,10 @@ export class BarterAgent {
     const verdict = evaluateProposal({
       account: this.identity.accountId, proposal: { termsHash: termsHash(terms), terms }, intents: this.intents, now: this.#now(), openEpoch,
     });
-    return verdict.ok ? signBundle(terms, this.identity.accountId, this.identity.voucherSecretKey) : null;
+    if (!verdict.ok) return null;
+    const signed = signBundle(terms, this.identity.accountId, this.identity.voucherSecretKey);
+    this.#intents.delete(verdict.intentHash); // A-AG-07: one intent, one signed bundle
+    return signed;
   }
 
   /** Fetch the proposals waiting for this agent's signature; sign those that match an intent, reject the rest. */
@@ -324,6 +327,7 @@ export class BarterAgent {
       }
       const { signature } = signBundle(proposal.terms, account, this.identity.voucherSecretKey);
       await this.book.signProposal(proposal.termsHash, account, signature);
+      this.#intents.delete(verdict.intentHash); // A-AG-07: one intent, one signed bundle; a second proposal for the same need is no longer matched
       answers.push({ termsHash: proposal.termsHash, action: "signed" });
     }
     return answers;
