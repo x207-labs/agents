@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { listingHash } from "@x207/core";
-import { DEFAULT_BARTER_POLICY, PolicyAgent, buildListing, decide, decideRule, matchesPolicy, type BarterPolicy, type DecisionContext } from "../shared/barter-policy.ts";
+import { DEFAULT_BARTER_POLICY, PolicyAgent, buildListing, decide, decideRule, matchesPolicy, parseBarterPolicy, type BarterPolicy, type DecisionContext } from "../shared/barter-policy.ts";
 import type { LlmClient } from "../shared/nearai.ts";
 import { acct, BACKEND_AVAILABLE, CONTRACT, startMarketBook, type MarketBook } from "./market.ts";
 
@@ -49,6 +49,22 @@ describe("AG-041 audit LOW findings (A-AG-06, A-AG-16)", () => {
     const tiny = { ...c, listing: { ...c.listing, offer: { ...c.listing.offer, quantity: 1, value: "1" } } };
     expect(decideRule(tiny)).toEqual({ action: "reject", reason: "value_not_positive" });
     expect(decideRule({ ...tiny, role: "buyer", policy: buyerPolicy })).toEqual({ action: "reject", reason: "value_not_positive" });
+  });
+});
+
+describe("AG-044 policy parser (A-AG-16)", () => {
+  it("TC-AG-044-01 a good policy passes over the defaults and each wrong field is named", () => {
+    expect(parseBarterPolicy(sellerPolicy)).toEqual(sellerPolicy);
+    expect(parseBarterPolicy({}).minAcceptBps).toBe(DEFAULT_BARTER_POLICY.minAcceptBps);
+    const bad = (patch: object) => () => parseBarterPolicy({ ...sellerPolicy, ...patch });
+    expect(bad({ minAcceptBps: 12_000 })).toThrow(/minAcceptBps/);
+    expect(bad({ stepBps: 1.5 })).toThrow(/stepBps/);
+    expect(bad({ rejectBelowBps: 9500 })).toThrow(/rejectBelowBps/);
+    expect(bad({ maxRounds: 0 })).toThrow(/maxRounds/);
+    expect(bad({ acceptPayment: "yes" })).toThrow(/acceptPayment/);
+    expect(bad({ holdings: [{ ...sellerPolicy.holdings[0], unitValue: "1.5" }] })).toThrow(/holdings\[0\]\.unitValue/);
+    expect(bad({ needs: [{ ...sellerPolicy.needs[0], quantity: 0 }] })).toThrow(/needs\[0\]\.quantity/);
+    expect(() => parseBarterPolicy(null)).toThrow(/object/);
   });
 });
 

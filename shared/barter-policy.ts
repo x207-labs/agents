@@ -39,6 +39,39 @@ export type BarterPolicy = {
   deliverDays: number;
 };
 
+const AMOUNT_TEXT = /^[1-9]\d{0,37}$/;
+const BPS_FIELDS = ["discountBps", "minAcceptBps", "rejectBelowBps", "openingBps", "stepBps"] as const;
+
+/**
+ * A-AG-16: the policy comes from a file or from the owner; one wrong number (a unit value of "1.5", a quantity of 0, bps of 12000) made `BigInt()` throw in the middle of a run.
+ * Returns the policy over the defaults, or throws one error that names the field.
+ */
+export function parseBarterPolicy(input: unknown): BarterPolicy {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) throw new Error("barter policy must be an object");
+  const raw = input as Record<string, unknown>;
+  const policy = { ...DEFAULT_BARTER_POLICY, ...raw } as BarterPolicy;
+  for (const field of BPS_FIELDS) {
+    const v = policy[field];
+    if (!Number.isInteger(v) || v < 0 || v > 10_000) throw new Error(`barter policy ${field} must be an integer from 0 to 10000`);
+  }
+  for (const [field, min] of [["maxRounds", 1], ["listingTtlSeconds", 1], ["deliverDays", 0]] as const) {
+    const v = policy[field];
+    if (!Number.isInteger(v) || v < min) throw new Error(`barter policy ${field} must be an integer of at least ${min}`);
+  }
+  if (policy.rejectBelowBps > policy.minAcceptBps) throw new Error("barter policy rejectBelowBps must not exceed minAcceptBps");
+  for (const field of ["acceptPayment", "discoverable", "acceptReferrals"] as const) if (typeof policy[field] !== "boolean") throw new Error(`barter policy ${field} must be true or false`);
+  for (const [list, price] of [["holdings", "unitValue"], ["needs", "maxUnitValue"]] as const) {
+    const items = policy[list] as Array<Record<string, unknown>>;
+    if (!Array.isArray(items)) throw new Error(`barter policy ${list} must be a list`);
+    items.forEach((item, i) => {
+      if (typeof item !== "object" || item === null || typeof item.assetType !== "string" || item.assetType === "") throw new Error(`barter policy ${list}[${i}].assetType must be a text`);
+      if (!Number.isSafeInteger(item.quantity) || (item.quantity as number) < 1) throw new Error(`barter policy ${list}[${i}].quantity must be a positive integer`);
+      if (typeof item[price] !== "string" || !AMOUNT_TEXT.test(item[price] as string)) throw new Error(`barter policy ${list}[${i}].${price} must be a positive integer as text`);
+    });
+  }
+  return policy;
+}
+
 export const DEFAULT_BARTER_POLICY: BarterPolicy = {
   holdings: [],
   needs: [],
@@ -233,7 +266,7 @@ export class PolicyAgent {
   constructor(options: PolicyAgentOptions) {
     this.identity = options.identity;
     this.book = options.book;
-    this.policy = options.policy;
+    this.policy = parseBarterPolicy(options.policy);
     this.#contractId = options.contractId;
     this.#llm = options.llm;
     this.#now = options.now ?? (() => Math.floor(Date.now() / 1000));
