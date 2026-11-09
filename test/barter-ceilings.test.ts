@@ -116,14 +116,42 @@ describe("AG-037 A-AG-03 the agent signs only the bundle that its own planOffer 
   const offer: Offer = { circle: CONTRACT, listing_hash: listingView.listingHash, proposer: "buyer.testnet", round: 1, mode: "barter", value: C(95), quantity: 10, deliver_by: NOW + 86_400 };
   const real = planOffer({ listing: toListing(listingView), offer, epoch: 3, counterparty: "buyer.testnet" });
 
-  function agentWith(bundle: unknown) {
+  function agentWith(bundle: unknown, bundleLimit?: { maxBundlePerEpoch?: string; maxBundleLeg?: string }) {
     const { book, calls } = stubBook({
       inbox: async () => [{ ...offerView }],
       offersOf: async () => [{ ...offerView }],
       previewAccept: async () => ({ epoch: 3, bundle }),
     });
-    return { agent: new PolicyAgent({ identity: identity("seller.testnet"), book, contractId: CONTRACT, policy: seller, now: () => NOW }), calls };
+    return { agent: new PolicyAgent({ identity: identity("seller.testnet"), book, contractId: CONTRACT, policy: seller, now: () => NOW, ...(bundleLimit ? { bundleLimit } : {}) }), calls };
   }
+
+  it("TC-AG-046-20 owner bundle limits bind the PolicyAgent: a payer leg over maxBundleLeg or a second bundle over maxBundlePerEpoch is not signed; at the limit it is signed", async () => {
+    expect(real.kind).toBe("bundle");
+    if (real.kind !== "bundle") return;
+    const bundle = { terms: real.terms, termsHash: real.terms_hash };
+    const payLegs = real.terms.legs.filter((l) => l.payer === "seller.testnet").map((l) => BigInt(l.max_amount));
+    expect(payLegs.length).toBeGreaterThan(0);
+    const biggest = payLegs.reduce((a, b) => (a > b ? a : b));
+    const total = payLegs.reduce((a, b) => a + b, 0n);
+
+    const below = agentWith(bundle, { maxBundleLeg: String(biggest - 1n) });
+    await expect(below.agent.handleInbox()).rejects.toThrow(/over_owner_leg_limit/);
+    expect(below.calls.accepted).toHaveLength(0);
+
+    const atLeg = agentWith(bundle, { maxBundleLeg: String(biggest) });
+    expect((await atLeg.agent.handleInbox())[0]?.kind).toBe("accepted");
+    expect(atLeg.calls.accepted).toHaveLength(1);
+
+    const epochBelow = agentWith(bundle, { maxBundlePerEpoch: String(total - 1n) });
+    await expect(epochBelow.agent.handleInbox()).rejects.toThrow(/over_owner_limit/);
+    expect(epochBelow.calls.accepted).toHaveLength(0);
+
+    const epochAt = agentWith(bundle, { maxBundlePerEpoch: String(total) });
+    expect((await epochAt.agent.handleInbox())[0]?.kind).toBe("accepted");
+    // the limit counts what was signed: the same epoch cannot take a second bundle of the same size
+    await expect(epochAt.agent.handleInbox()).rejects.toThrow(/over_owner_limit/);
+    expect(epochAt.calls.accepted).toHaveLength(1);
+  });
 
   it("TC-AG-037-01 the bundle that equals the local plan is signed; legs with another payee or amount are not signed", async () => {
     expect(real.kind).toBe("bundle");

@@ -204,7 +204,7 @@ export class BookClient {
 
 export type Evaluation =
   | { ok: true; intentHash: string }
-  | { ok: false; reason: "terms_hash_mismatch" | "wrong_circle" | "not_participant" | "epoch_mismatch" | "no_open_intent" | "no_leg" | "underpaid" | "overpay" | "over_owner_limit" };
+  | { ok: false; reason: "terms_hash_mismatch" | "wrong_circle" | "not_participant" | "epoch_mismatch" | "no_open_intent" | "no_leg" | "underpaid" | "overpay" | "over_owner_limit" | "over_owner_leg_limit" };
 
 const sum = (values: Iterable<string>): bigint => [...values].reduce((total, v) => total + BigInt(v), 0n);
 
@@ -243,6 +243,44 @@ export function evaluateProposal(args: {
   return { ok: false, reason };
 }
 
+export type BundleLimitOptions = {
+  /** Most the owner lets the agent commit to pay in bundles per epoch (sum of its payer legs, smallest unit). */
+  maxBundlePerEpoch?: string;
+  /** Most the owner lets the agent pay in one leg of one bundle (the barter counterpart of `maxPerCall`). */
+  maxBundleLeg?: string;
+};
+
+/** The owner's limits on what an agent signs in bundles (AG-046). Opt-in: the micro-payment `maxPerCall`/`maxPerEpoch` are another scale and are not reused. */
+export class BundleLimit {
+  readonly #account: string;
+  readonly #perEpoch: bigint | null;
+  readonly #perLeg: bigint | null;
+  readonly #committed = new Map<number, bigint>();
+
+  constructor(account: string, options: BundleLimitOptions = {}) {
+    this.#account = account;
+    this.#perEpoch = options.maxBundlePerEpoch === undefined ? null : BigInt(options.maxBundlePerEpoch);
+    this.#perLeg = options.maxBundleLeg === undefined ? null : BigInt(options.maxBundleLeg);
+  }
+
+  #legs(terms: BundleTerms): bigint[] {
+    return terms.legs.filter((l) => l.payer === this.#account).map((l) => BigInt(l.max_amount));
+  }
+
+  /** The reason the agent must not sign these terms, or `null` when they fit the limits. Nothing is counted until `commit`. */
+  violation(terms: BundleTerms): "over_owner_leg_limit" | "over_owner_limit" | null {
+    const legs = this.#legs(terms);
+    if (this.#perLeg !== null && legs.some((amount) => amount > this.#perLeg!)) return "over_owner_leg_limit";
+    if (this.#perEpoch !== null && (this.#committed.get(terms.epoch) ?? 0n) + legs.reduce((a, b) => a + b, 0n) > this.#perEpoch) return "over_owner_limit";
+    return null;
+  }
+
+  /** Count the payer legs of terms that were signed. */
+  commit(terms: BundleTerms): void {
+    this.#committed.set(terms.epoch, (this.#committed.get(terms.epoch) ?? 0n) + this.#legs(terms).reduce((a, b) => a + b, 0n));
+  }
+}
+
 export type ProposalAnswer = { termsHash: string; action: "signed" | "rejected"; reason?: string };
 
 export type BarterAgentOptions = {
@@ -257,6 +295,8 @@ export type BarterAgentOptions = {
    * micro payments, a bundle leg is a settlement cap of another scale, and reusing it would refuse every normal barter. Without it, bundles are bounded only by the intents (AG-046).
    */
   maxBundlePerEpoch?: string;
+  /** What the owner lets this agent pay in one leg of one bundle (AG-046, the barter counterpart of `maxPerCall`). */
+  maxBundleLeg?: string;
 };
 
 /** An agent that places offer/need intents and signs the bundle proposals that match its intents. */
@@ -266,13 +306,11 @@ export class BarterAgent {
   readonly #contractId: string;
   readonly #now: () => number;
   readonly #intents = new Map<string, BarterIntent>();
-  /** What the agent has already signed to pay, per epoch (the legs where it is the payer), for `maxBundlePerEpoch`. */
-  readonly #committed = new Map<number, bigint>();
-  readonly #maxBundlePerEpoch: bigint | null;
+  readonly #limit: BundleLimit;
 
   constructor(options: BarterAgentOptions) {
-    this.#maxBundlePerEpoch = options.maxBundlePerEpoch === undefined ? null : BigInt(options.maxBundlePerEpoch);
     this.identity = options.identity;
+    this.#limit = new BundleLimit(options.identity.accountId, options);
     this.book = options.book;
     this.#contractId = options.contractId;
     this.#now = options.now ?? (() => Math.floor(Date.now() / 1000));
@@ -302,23 +340,12 @@ export class BarterAgent {
     return { intent_hash: intentHashBase58(intent) };
   }
 
-  /** The legs where this agent pays, summed. */
-  #payLegs(terms: BundleTerms): bigint {
-    return sum(terms.legs.filter((l) => l.payer === this.identity.accountId).map((l) => l.max_amount));
-  }
-  /** `maxBundlePerEpoch` of the owner: what was signed before in this epoch plus this bundle must stay within it. */
-  #overOwnerLimit(terms: BundleTerms): boolean {
-    return this.#maxBundlePerEpoch !== null && (this.#committed.get(terms.epoch) ?? 0n) + this.#payLegs(terms) > this.#maxBundlePerEpoch;
-  }
-  #commit(terms: BundleTerms): void {
-    this.#committed.set(terms.epoch, (this.#committed.get(terms.epoch) ?? 0n) + this.#payLegs(terms));
-  }
-
   /** Evaluate one proposal against the agent's own intents and the owner's epoch limit, without signing. */
   async evaluate(proposal: BundleProposalView): Promise<Evaluation> {
     const openEpoch = await this.book.openEpoch();
     const verdict = evaluateProposal({ account: this.identity.accountId, proposal, intents: this.intents, now: this.#now(), openEpoch });
-    return verdict.ok && this.#overOwnerLimit(proposal.terms) ? { ok: false, reason: "over_owner_limit" } : verdict;
+    const over = verdict.ok ? this.#limit.violation(proposal.terms) : null;
+    return over ? { ok: false, reason: over } : verdict;
   }
 
   /**
@@ -330,9 +357,9 @@ export class BarterAgent {
     const verdict = evaluateProposal({
       account: this.identity.accountId, proposal: { termsHash: termsHash(terms), terms }, intents: this.intents, now: this.#now(), openEpoch,
     });
-    if (!verdict.ok || this.#overOwnerLimit(terms)) return null;
+    if (!verdict.ok || this.#limit.violation(terms)) return null;
     const signed = signBundle(terms, this.identity.accountId, this.identity.voucherSecretKey);
-    this.#commit(terms);
+    this.#limit.commit(terms);
     this.#intents.delete(verdict.intentHash); // A-AG-07: one intent, one signed bundle
     return signed;
   }
@@ -350,7 +377,7 @@ export class BarterAgent {
       }
       const { signature } = signBundle(proposal.terms, account, this.identity.voucherSecretKey);
       await this.book.signProposal(proposal.termsHash, account, signature);
-      this.#commit(proposal.terms);
+      this.#limit.commit(proposal.terms);
       this.#intents.delete(verdict.intentHash); // A-AG-07: one intent, one signed bundle; a second proposal for the same need is no longer matched
       answers.push({ termsHash: proposal.termsHash, action: "signed" });
     }

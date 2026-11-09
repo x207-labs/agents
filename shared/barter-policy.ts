@@ -6,7 +6,7 @@ import {
   ASSET_CLASSES, listingHash, planOffer, signBundle, signListing, signOffer, signReferral, signRefuseReferral, termsHash,
   type AssetClass, type Listing, type Offer, type Referral,
 } from "@x207/core";
-import { BookClient, type AcceptResult, type ListingView, type OfferView, type ReferralView } from "./barter.ts";
+import { BookClient, BundleLimit, type BundleLimitOptions, type AcceptResult, type ListingView, type OfferView, type ReferralView } from "./barter.ts";
 import type { SeekerPlan } from "./seeker.ts";
 import type { AgentIdentity } from "./identity.ts";
 import type { LlmClient } from "./nearai.ts";
@@ -252,6 +252,8 @@ export type PolicyAgentOptions = {
   llm?: LlmClient;
   /** Detik unix. */
   now?: () => number;
+  /** Owner limits on the bundles this agent signs (AG-046): `maxBundlePerEpoch`, `maxBundleLeg`. Without them bundles are bounded only by the policy. */
+  bundleLimit?: BundleLimitOptions;
 };
 
 /** An agent that runs its owner's marketplace policy against the listing book. */
@@ -262,6 +264,7 @@ export class PolicyAgent {
   readonly #contractId: string;
   readonly #llm: LlmClient | undefined;
   readonly #now: () => number;
+  readonly #limit: BundleLimit;
   readonly #listings = new Map<string, Listing>();
   readonly #ownLast = new Map<string, string>();
   #counter = 0;
@@ -273,6 +276,7 @@ export class PolicyAgent {
     this.#contractId = options.contractId;
     this.#llm = options.llm;
     this.#now = options.now ?? (() => Math.floor(Date.now() / 1000));
+    this.#limit = new BundleLimit(options.identity.accountId, options.bundleLimit);
   }
 
   /** Place listings from the owner's goods and needs. */
@@ -448,7 +452,13 @@ export class PolicyAgent {
         answers.push({ termsHash: proposal.termsHash, action: "rejected", reason: "terms_differ_from_negotiation" });
         continue;
       }
+      const over = this.#limit.violation(proposal.terms);
+      if (over) {
+        answers.push({ termsHash: proposal.termsHash, action: "rejected", reason: over });
+        continue;
+      }
       await this.book.signProposal(proposal.termsHash, account, signBundle(proposal.terms, account, this.identity.voucherSecretKey).signature);
+      this.#limit.commit(proposal.terms);
       answers.push({ termsHash: proposal.termsHash, action: "signed" });
     }
     return answers;
@@ -499,7 +509,10 @@ export class PolicyAgent {
       }
     } else why = "the bundle pays more than one party besides the seller and the counterparty";
     if (!matched) throw new Error(`bundle_differs_from_local_plan: ${why}; not signed`);
+    const over = this.#limit.violation(preview.bundle.terms);
+    if (over) throw new Error(`${over}: the bundle pays more than the owner allows; not signed`);
     const { signature } = signBundle(preview.bundle.terms, account, this.identity.voucherSecretKey);
+    this.#limit.commit(preview.bundle.terms);
     return this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch, signature, ...seeker });
   }
 }

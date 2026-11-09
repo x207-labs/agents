@@ -15,7 +15,7 @@ const terms = (other: string, amount: number): BundleTerms => ({
   legs: [{ payer: ME, payee: other, max_amount: C(amount) }, { payer: other, payee: ME, max_amount: C(amount) }],
 });
 
-function agent(proposals: Array<{ termsHash: string; terms: BundleTerms; missing: string[] }> = [], maxBundlePerEpoch?: string) {
+function agent(proposals: Array<{ termsHash: string; terms: BundleTerms; missing: string[] }> = [], maxBundlePerEpoch?: string, maxBundleLeg?: string) {
   const signed: string[] = [];
   const book = {
     openEpoch: async () => 7,
@@ -23,7 +23,7 @@ function agent(proposals: Array<{ termsHash: string; terms: BundleTerms; missing
     signProposal: async (hash: string) => { signed.push(hash); },
     postIntent: async () => ({}),
   };
-  const a = new BarterAgent({ identity, book: book as never, contractId: CIRCLE, now: () => NOW, ...(maxBundlePerEpoch === undefined ? {} : { maxBundlePerEpoch }) });
+  const a = new BarterAgent({ identity, book: book as never, contractId: CIRCLE, now: () => NOW, ...(maxBundlePerEpoch === undefined ? {} : { maxBundlePerEpoch }), ...(maxBundleLeg === undefined ? {} : { maxBundleLeg }) });
   return { a, signed };
 }
 
@@ -72,6 +72,18 @@ describe("AG-046 the owner's epoch limit also bounds the bundles the agent signs
     const answers = await a.answerProposals();
     expect(answers).toEqual([{ termsHash: termsHash(t2), action: "rejected", reason: "over_owner_limit" }]);
     expect(signed).toEqual([]);
+  });
+
+  it("TC-AG-046-13 maxBundleLeg: a payer leg of 40 credit with a limit of 39.999999 is refused (over_owner_leg_limit); at 40 it is signed; the epoch total is not required", async () => {
+    const t = terms("x.x207-circle.test.near", 40);
+    const over = agent([{ termsHash: termsHash(t), terms: t, missing: [ME] }], undefined, String(40_000_000 - 1));
+    await over.a.postIntent({ service: "a", calls: 1, value: C(40) }, { service: "b", calls: 1, value: C(40) }, 3600);
+    expect(await over.a.evaluate({ termsHash: termsHash(t), terms: t, missing: [ME] } as never)).toEqual({ ok: false, reason: "over_owner_leg_limit" });
+    expect(await over.a.signTerms(t)).toBeNull();
+    expect(over.a.intents).toHaveLength(1);
+    const ok = agent([], undefined, C(40));
+    await ok.a.postIntent({ service: "a", calls: 1, value: C(40) }, { service: "b", calls: 1, value: C(40) }, 3600);
+    expect(await ok.a.signTerms(t)).not.toBeNull();
   });
 
   it("TC-AG-046-12 without maxBundlePerEpoch nothing changes: the spend policy of micro payments (maxPerEpoch 50) does not refuse a 60 credit bundle", async () => {
