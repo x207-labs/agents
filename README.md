@@ -40,7 +40,7 @@ An agent listens on `127.0.0.1` (AG-038). `AGENT_HOST` picks another interface, 
 
 ## Dependencies
 
-`@x207/core` and `@x207/scheme` are not installed from npm: the registry holds `@x207/core@0.0.2`, which carries contract ABI 0.0.15, while the contract in use is 0.0.17 (AG-040). The agents run inside the umbrella workspace (`x207-labs/x207`, `npm ci` at its root), where the packages are linked from `sdk/packages/`. The own `package-lock.json` of this folder (like the one of `solver`) still names the registry copy: the pins check wants a committed lockfile in every repo, and it is only used by a lone `npm ci` here, which is not how CI or the jury run it. `test/core-abi.test.ts` fails if the resolved `@x207/core` is not the workspace one at ABI 0.0.17.
+`@x207/core` and `@x207/scheme` are not installed from npm: the registry holds `@x207/core@0.0.2`, which carries contract ABI 0.0.15, while the contract in use is 0.0.17 (AG-040; on the branch `p1-0.0.18` it is 0.0.18, the sale of a NEAR account, AG-050). The agents run inside the umbrella workspace (`x207-labs/x207`, `npm ci` at its root), where the packages are linked from `sdk/packages/`. The own `package-lock.json` of this folder (like the one of `solver`) still names the registry copy: the pins check wants a committed lockfile in every repo, and it is only used by a lone `npm ci` here, which is not how CI or the jury run it. `test/core-abi.test.ts` fails if the resolved `@x207/core` is not the workspace one at the ABI in use (0.0.17 on main, 0.0.18 on the branch `p1-0.0.18`).
 
 ## Try it
 
