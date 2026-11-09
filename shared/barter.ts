@@ -279,6 +279,22 @@ export class BundleLimit {
   commit(terms: BundleTerms): void {
     this.#committed.set(terms.epoch, (this.#committed.get(terms.epoch) ?? 0n) + this.#legs(terms).reduce((a, b) => a + b, 0n));
   }
+
+  /**
+   * Check and count in one synchronous step, so two signings that run at the same time (each awaiting the book) cannot both pass the check before either is counted.
+   * Call it before the first `await` of the signing; `release` it if the signing fails.
+   */
+  reserve(terms: BundleTerms): "over_owner_leg_limit" | "over_owner_limit" | null {
+    const over = this.violation(terms);
+    if (over === null) this.commit(terms);
+    return over;
+  }
+
+  /** Undo a `reserve` whose signing did not happen. */
+  release(terms: BundleTerms): void {
+    const total = this.#legs(terms).reduce((a, b) => a + b, 0n);
+    this.#committed.set(terms.epoch, (this.#committed.get(terms.epoch) ?? 0n) - total);
+  }
 }
 
 export type ProposalAnswer = { termsHash: string; action: "signed" | "rejected"; reason?: string };
@@ -357,9 +373,8 @@ export class BarterAgent {
     const verdict = evaluateProposal({
       account: this.identity.accountId, proposal: { termsHash: termsHash(terms), terms }, intents: this.intents, now: this.#now(), openEpoch,
     });
-    if (!verdict.ok || this.#limit.violation(terms)) return null;
+    if (!verdict.ok || this.#limit.reserve(terms)) return null;
     const signed = signBundle(terms, this.identity.accountId, this.identity.voucherSecretKey);
-    this.#limit.commit(terms);
     this.#intents.delete(verdict.intentHash); // A-AG-07: one intent, one signed bundle
     return signed;
   }
@@ -375,9 +390,19 @@ export class BarterAgent {
         answers.push({ termsHash: proposal.termsHash, action: "rejected", reason: verdict.reason });
         continue;
       }
+      // reserve before the first await: a signing that runs at the same time must see this one in the count
+      const over = this.#limit.reserve(proposal.terms);
+      if (over) {
+        answers.push({ termsHash: proposal.termsHash, action: "rejected", reason: over });
+        continue;
+      }
       const { signature } = signBundle(proposal.terms, account, this.identity.voucherSecretKey);
-      await this.book.signProposal(proposal.termsHash, account, signature);
-      this.#limit.commit(proposal.terms);
+      try {
+        await this.book.signProposal(proposal.termsHash, account, signature);
+      } catch (error) {
+        this.#limit.release(proposal.terms);
+        throw error;
+      }
       this.#intents.delete(verdict.intentHash); // A-AG-07: one intent, one signed bundle; a second proposal for the same need is no longer matched
       answers.push({ termsHash: proposal.termsHash, action: "signed" });
     }

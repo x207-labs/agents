@@ -20,6 +20,7 @@ export type ProcurementPolicy = { spend: SpendPolicy; services: readonly Procure
 export type DenialReason =
   | "service_not_allowed"
   | "quote_unavailable"
+  | "redirect_refused"
   | "price_above_service_limit"
   | "over_per_call_limit"
   | "over_epoch_budget";
@@ -100,7 +101,9 @@ export class ProcurementAgent {
     const target = `${listed.url}${listed.path}?input=${encodeURIComponent(input)}`;
 
     // no redirect is followed: the payment header would go to the target of the redirect (A-AG-11)
-    const price = await readQuote(await this.#quote(target, { redirect: "manual" }));
+    const quoted = await this.#quote(target, { redirect: "manual" });
+    if (quoted.status >= 300 && quoted.status < 400) return this.#deny(service, "redirect_refused", { status: String(quoted.status), step: "quote" });
+    const price = await readQuote(quoted);
     if (price === null) return this.#deny(service, "quote_unavailable");
     const amount = BigInt(price);
     if (amount > BigInt(listed.maxPrice)) return this.#deny(service, "price_above_service_limit", { price, limit: listed.maxPrice });
@@ -110,6 +113,7 @@ export class ProcurementAgent {
     }
 
     const response = await this.#pay(target, { redirect: "manual" });
+    if (response.status >= 300 && response.status < 400) return this.#deny(service, "redirect_refused", { status: String(response.status), step: "pay" });
     if (response.status !== 200) return this.#deny(service, "quote_unavailable", { status: String(response.status) });
     this.#spent += amount;
     const result: Purchase = {

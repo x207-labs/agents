@@ -86,6 +86,32 @@ describe("AG-046 the owner's epoch limit also bounds the bundles the agent signs
     expect(await ok.a.signTerms(t)).not.toBeNull();
   });
 
+  it("TC-AG-046-14 two answerProposals at the same time cannot both pass maxBundlePerEpoch (50 credit, 30 each): one signs, one is rejected; a failed signing frees the room", async () => {
+    const t1 = terms("x.x207-circle.test.near", 30);
+    const signed: string[] = [];
+    let fail = false;
+    const book = {
+      openEpoch: async () => 7,
+      proposals: async () => [{ termsHash: termsHash(t1), terms: t1, missing: [ME] }],
+      signProposal: async (hash: string) => { await new Promise((r) => setTimeout(r, 10)); if (fail) throw new Error("book down"); signed.push(hash); },
+      postIntent: async () => ({}),
+    };
+    const a = new BarterAgent({ identity, book: book as never, contractId: CIRCLE, now: () => NOW, maxBundlePerEpoch: C(50) });
+    for (let i = 0; i < 2; i += 1) await a.postIntent({ service: "a", calls: 1, value: C(30) }, { service: "b", calls: 1, value: C(30) }, 3600);
+    // same proposal list in both calls, so the second signing is a different intent but the same epoch budget
+    const [r1, r2] = await Promise.all([a.answerProposals(), a.answerProposals()]);
+    const actions = [...r1, ...r2].map((x) => x.action).sort();
+    expect(actions).toEqual(["rejected", "signed"]);
+    expect(signed).toHaveLength(1);
+    // a failed signing releases its reservation
+    fail = true;
+    const b = new BarterAgent({ identity, book: book as never, contractId: CIRCLE, now: () => NOW, maxBundlePerEpoch: C(50) });
+    await b.postIntent({ service: "a", calls: 1, value: C(30) }, { service: "b", calls: 1, value: C(30) }, 3600);
+    await expect(b.answerProposals()).rejects.toThrow(/book down/);
+    fail = false;
+    expect((await b.answerProposals()).map((x) => x.action)).toEqual(["signed"]);
+  });
+
   it("TC-AG-046-12 without maxBundlePerEpoch nothing changes: the spend policy of micro payments (maxPerEpoch 50) does not refuse a 60 credit bundle", async () => {
     const big = terms("x.x207-circle.test.near", 60);
     const { a } = agent();

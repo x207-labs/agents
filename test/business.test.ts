@@ -80,7 +80,15 @@ describe("AG-020 procurement agent within budget", () => {
     expect(seen.every((init) => init?.redirect === "manual")).toBe(true);
     const redirect = (async () => new Response(null, { status: 302, headers: { location: "http://elsewhere.test/" } })) as typeof fetch;
     const other = new ProcurementAgent({ account: "gpu.x207-circle.near", policy: policy(), pay: m.pay, quote: redirect });
-    expect(await other.buy("translate", "hello")).toMatchObject({ ok: false, reason: "quote_unavailable" });
+    expect(await other.buy("translate", "hello")).toMatchObject({ ok: false, reason: "redirect_refused", detail: { status: "302", step: "quote" } });
+  });
+
+  it("TC-AG-046-02 a redirect on the paying request is refused and nothing is counted as spent", async () => {
+    const m = market({ "/api/translate": "30000" });
+    const payRedirect = (async () => new Response(null, { status: 307, headers: { location: "http://elsewhere.test/" } })) as typeof fetch;
+    const agent = new ProcurementAgent({ account: "gpu.x207-circle.near", policy: policy(), pay: payRedirect, quote: m.quote });
+    expect(await agent.buy("translate", "hello")).toMatchObject({ ok: false, reason: "redirect_refused", detail: { status: "307", step: "pay" } });
+    expect(agent.spent).toBe(0n);
   });
 
   it("TC-AG-020-04 epoch budget used up: the next purchase is rejected; a new epoch restores the budget", async () => {

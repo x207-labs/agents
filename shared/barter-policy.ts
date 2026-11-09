@@ -452,13 +452,18 @@ export class PolicyAgent {
         answers.push({ termsHash: proposal.termsHash, action: "rejected", reason: "terms_differ_from_negotiation" });
         continue;
       }
-      const over = this.#limit.violation(proposal.terms);
+      // reserve before the first await: a signing that runs at the same time must see this one in the count
+      const over = this.#limit.reserve(proposal.terms);
       if (over) {
         answers.push({ termsHash: proposal.termsHash, action: "rejected", reason: over });
         continue;
       }
-      await this.book.signProposal(proposal.termsHash, account, signBundle(proposal.terms, account, this.identity.voucherSecretKey).signature);
-      this.#limit.commit(proposal.terms);
+      try {
+        await this.book.signProposal(proposal.termsHash, account, signBundle(proposal.terms, account, this.identity.voucherSecretKey).signature);
+      } catch (error) {
+        this.#limit.release(proposal.terms);
+        throw error;
+      }
       answers.push({ termsHash: proposal.termsHash, action: "signed" });
     }
     return answers;
@@ -509,10 +514,15 @@ export class PolicyAgent {
       }
     } else why = "the bundle pays more than one party besides the seller and the counterparty";
     if (!matched) throw new Error(`bundle_differs_from_local_plan: ${why}; not signed`);
-    const over = this.#limit.violation(preview.bundle.terms);
+    // reserve before the first await: a signing that runs at the same time must see this one in the count
+    const over = this.#limit.reserve(preview.bundle.terms);
     if (over) throw new Error(`${over}: the bundle pays more than the owner allows; not signed`);
-    const { signature } = signBundle(preview.bundle.terms, account, this.identity.voucherSecretKey);
-    this.#limit.commit(preview.bundle.terms);
-    return this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch, signature, ...seeker });
+    try {
+      const { signature } = signBundle(preview.bundle.terms, account, this.identity.voucherSecretKey);
+      return await this.book.accept(listingHashHex, offerHashHex, { account, epoch: preview.epoch, signature, ...seeker });
+    } catch (error) {
+      this.#limit.release(preview.bundle.terms);
+      throw error;
+    }
   }
 }

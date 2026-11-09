@@ -153,6 +153,33 @@ describe("AG-037 A-AG-03 the agent signs only the bundle that its own planOffer 
     expect(epochAt.calls.accepted).toHaveLength(1);
   });
 
+  it("TC-AG-046-21 two accepts at the same time (slow book) cannot both pass maxBundlePerEpoch: one is accepted, one refused; a failed accept frees the room", async () => {
+    expect(real.kind).toBe("bundle");
+    if (real.kind !== "bundle") return;
+    const bundle = { terms: real.terms, termsHash: real.terms_hash };
+    const total = real.terms.legs.filter((l) => l.payer === "seller.testnet").reduce((a, l) => a + BigInt(l.max_amount), 0n);
+    let fail = false;
+    const make = () => {
+      const { book, calls } = stubBook({
+        inbox: async () => [{ ...offerView }],
+        offersOf: async () => [{ ...offerView }],
+        previewAccept: async () => ({ epoch: 3, bundle }),
+        accept: async (...args: unknown[]) => { await new Promise((r) => setTimeout(r, 10)); if (fail) throw new Error("book down"); calls.accepted.push(args); return {}; },
+      });
+      return { agent: new PolicyAgent({ identity: identity("seller.testnet"), book, contractId: CONTRACT, policy: seller, now: () => NOW, bundleLimit: { maxBundlePerEpoch: String(total) } }), calls };
+    };
+    const a = make();
+    const settled = await Promise.allSettled([a.agent.handleInbox(), a.agent.handleInbox()]);
+    expect(settled.map((s) => s.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(a.calls.accepted).toHaveLength(1);
+
+    fail = true;
+    const b = make();
+    await expect(b.agent.handleInbox()).rejects.toThrow(/book down/);
+    fail = false;
+    expect((await b.agent.handleInbox())[0]?.kind).toBe("accepted");
+  });
+
   it("TC-AG-037-01 the bundle that equals the local plan is signed; legs with another payee or amount are not signed", async () => {
     expect(real.kind).toBe("bundle");
     if (real.kind !== "bundle") return;
