@@ -10,6 +10,7 @@ import { BookClient, BundleLimit, type BundleLimitOptions, type AcceptResult, ty
 import type { SeekerPlan } from "./seeker.ts";
 import type { AgentIdentity } from "./identity.ts";
 import type { LlmClient } from "./nearai.ts";
+import { AppraiserError, askingTotal, creditsOf, detailWithAppraisal, type AppraisalAsset, type AppraiserClient, type Appraisal } from "./appraiser.ts";
 
 /** Goods the owner holds and may release. `unitValue` is in credit smallest units per unit. */
 export type Holding = { assetType: string; assetClass: AssetClass; quantity: number; unitValue: string };
@@ -206,6 +207,10 @@ export function buildListing(args: {
   nonce: string;
   holding?: number;
   need?: number;
+  /** AG-051: asking total from an appraisal (smallest units) instead of unit price × quantity. */
+  offerValue?: string;
+  /** AG-051: the appraisal named in `detail` (`appraisal=apr_...`). */
+  appraisalId?: string;
 }): Listing {
   const holding = args.policy.holdings[args.holding ?? 0];
   const need = args.policy.needs[args.need ?? 0];
@@ -217,10 +222,10 @@ export function buildListing(args: {
   return {
     circle: args.contractId,
     account: args.identity.accountId,
-    offer: { asset_type: holding.assetType, asset_class: holding.assetClass, quantity: holding.quantity, value: String(BigInt(holding.unitValue) * BigInt(holding.quantity)) },
+    offer: { asset_type: holding.assetType, asset_class: holding.assetClass, quantity: holding.quantity, value: args.offerValue ?? String(BigInt(holding.unitValue) * BigInt(holding.quantity)) },
     want: { asset_type: need.assetType, asset_class: need.assetClass, quantity: need.quantity, value: String(BigInt(need.maxUnitValue) * BigInt(need.quantity)) },
     terms: "delivery as agreed in the accepted offer",
-    detail: `${holding.assetType} for ${need.assetType}`,
+    detail: args.appraisalId ? detailWithAppraisal(`${holding.assetType} for ${need.assetType}`, args.appraisalId) : `${holding.assetType} for ${need.assetType}`,
     expires_at: args.now + args.policy.listingTtlSeconds,
     discount_bps: args.policy.discountBps,
     accept_payment: args.policy.acceptPayment,
@@ -254,6 +259,16 @@ export type PolicyAgentOptions = {
   now?: () => number;
   /** Owner limits on the bundles this agent signs (AG-046): `maxBundlePerEpoch`, `maxBundleLeg`. Without them bundles are bounded only by the policy. */
   bundleLimit?: BundleLimitOptions;
+  /**
+   * AG-051: ask the x207 appraiser (NEAR AI Cloud, TEE) before pricing a listing. `describe` adds what the appraiser needs beyond the
+   * holding (scope, provider, duration). The appraised value is used only when its signature was checked, and is kept within
+   * `maxDeviationBps` (default 5000) of the owner's own total. When the appraiser fails, the owner's price is listed without it.
+   */
+  appraiser?: {
+    client: AppraiserClient;
+    describe: (holding: Holding) => Pick<AppraisalAsset, "scope" | "provider" | "duration_days" | "description">;
+    maxDeviationBps?: number;
+  };
 };
 
 /** An agent that runs its owner's marketplace policy against the listing book. */
@@ -265,6 +280,7 @@ export class PolicyAgent {
   readonly #llm: LlmClient | undefined;
   readonly #now: () => number;
   readonly #limit: BundleLimit;
+  readonly #appraiser: PolicyAgentOptions["appraiser"];
   readonly #listings = new Map<string, Listing>();
   readonly #ownLast = new Map<string, string>();
   #counter = 0;
@@ -277,16 +293,38 @@ export class PolicyAgent {
     this.#llm = options.llm;
     this.#now = options.now ?? (() => Math.floor(Date.now() / 1000));
     this.#limit = new BundleLimit(options.identity.accountId, options.bundleLimit);
+    this.#appraiser = options.appraiser;
   }
 
-  /** Place listings from the owner's goods and needs. */
-  async list(holding = 0, need = 0): Promise<{ listing: Listing; hash: string }> {
+  /** Place listings from the owner's goods and needs; with an appraiser, ask it first (AG-051). */
+  async list(holding = 0, need = 0): Promise<{ listing: Listing; hash: string; appraisal?: Appraisal; appraisalError?: string }> {
     const nonce = `${this.identity.accountId.split(".")[0]}-${this.#now()}-${(this.#counter += 1)}`;
-    const listing = buildListing({ identity: this.identity, contractId: this.#contractId, policy: this.policy, now: this.#now(), nonce, holding, need });
+    const priced = await this.#appraise(holding);
+    const listing = buildListing({
+      identity: this.identity, contractId: this.#contractId, policy: this.policy, now: this.#now(), nonce, holding, need,
+      ...(priced.appraisal ? { appraisalId: priced.appraisal.appraisal_id } : {}),
+      ...(priced.offerValue ? { offerValue: priced.offerValue } : {}),
+    });
     await this.book.postListing(listing, signListing(listing, this.identity.voucherSecretKey));
     const hash = listingHash(listing);
     this.#listings.set(hash, listing);
-    return { listing, hash };
+    return { listing, hash, ...(priced.appraisal ? { appraisal: priced.appraisal } : {}), ...(priced.error ? { appraisalError: priced.error } : {}) };
+  }
+
+  async #appraise(index: number): Promise<{ appraisal?: Appraisal; offerValue?: string; error?: string }> {
+    const holding = this.policy.holdings[index];
+    if (!this.#appraiser || !holding) return {};
+    const ownerTotal = BigInt(holding.unitValue) * BigInt(holding.quantity);
+    try {
+      const appraisal = await this.#appraiser.client.appraise({
+        asset_type: holding.assetType, asset_class: holding.assetClass, quantity: holding.quantity,
+        market_price_credits: creditsOf(ownerTotal), ...this.#appraiser.describe(holding),
+      });
+      const asked = askingTotal(ownerTotal, appraisal, this.#appraiser.maxDeviationBps);
+      return { appraisal, ...(asked.used ? { offerValue: asked.total.toString() } : {}) };
+    } catch (err) {
+      return { error: err instanceof AppraiserError ? err.code : err instanceof Error ? err.message : "appraiser failed" };
+    }
   }
 
   #toListing(view: ListingView): Listing {
