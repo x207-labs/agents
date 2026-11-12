@@ -1,0 +1,489 @@
+{
+  "item": "AG-052",
+  "contract": "x207-v018.testnet",
+  "circle": "agents-main",
+  "started_at": "2026-11-12T17:06:59.201Z",
+  "members": [
+    {
+      "name": "alice",
+      "account": "alice.x207-v18-own.testnet",
+      "asset": "maps:geocoding-quota"
+    },
+    {
+      "name": "bob",
+      "account": "bob.x207-v18-own.testnet",
+      "asset": "license:software-nft"
+    },
+    {
+      "name": "dan2",
+      "account": "dan2.x207-v18-own.testnet",
+      "asset": "near-rpc:access"
+    }
+  ],
+  "appraisals": {
+    "alice": {
+      "holder": "alice.x207-v18-own.testnet",
+      "catalog_no": 64,
+      "asset": {
+        "asset_type": "maps:geocoding-quota",
+        "asset_class": "C",
+        "quantity": 4,
+        "scope": "4 bundles of 10000 forward geocoding calls each, read-only, 10 requests per second, used through the seller's proxy",
+        "provider": "Mapbox",
+        "duration_days": 30,
+        "market_price_credits": "30",
+        "description": "Seat of a monthly plan; the API key stays with the seller, the buyer calls through the seller's proxy, one unit of quota per paid call."
+      },
+      "appraisal_id": "apr_4d97a431de9635c442083c67",
+      "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+      "cached": false,
+      "value_credits": "24",
+      "range": {
+        "low": "20",
+        "high": "28"
+      },
+      "confidence": 0.8,
+      "flags": [
+        "market_price_used"
+      ],
+      "verified": {
+        "signature": true,
+        "signature_reasons": [],
+        "attestation": "checked"
+      },
+      "url": "https://v018.x207.boxd.sh/x207/appraisals/apr_4d97a431de9635c442083c67"
+    },
+    "bob": {
+      "holder": "bob.x207-v18-own.testnet",
+      "catalog_no": 5,
+      "asset": {
+        "asset_type": "license:software-nft",
+        "asset_class": "A",
+        "quantity": 1,
+        "scope": "One transferable 12-month seat of a developer tool license, held as an NFT; the holder of the NFT is the licensee",
+        "provider": "JetBrains",
+        "duration_days": 365,
+        "market_price_credits": "32",
+        "description": "Seat license as an NFT on NEAR; the license terms of the vendor apply to the new holder."
+      },
+      "appraisal_id": "apr_d2e83a701cbcbed1309a46fa",
+      "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+      "cached": false,
+      "value_credits": "32",
+      "range": {
+        "low": "30",
+        "high": "34"
+      },
+      "confidence": 0.9,
+      "flags": [
+        "market_price_used"
+      ],
+      "verified": {
+        "signature": true,
+        "signature_reasons": [],
+        "attestation": "checked"
+      },
+      "url": "https://v018.x207.boxd.sh/x207/appraisals/apr_d2e83a701cbcbed1309a46fa"
+    },
+    "dan2": {
+      "holder": "dan2.x207-v18-own.testnet",
+      "catalog_no": 15,
+      "asset": {
+        "asset_type": "near-rpc:access",
+        "asset_class": "B",
+        "quantity": 1,
+        "scope": "Function-call access key to one NEAR account that holds a paid premium RPC subscription, limited to view calls, 30 days",
+        "provider": "FastNEAR",
+        "duration_days": 30,
+        "market_price_credits": "28",
+        "description": "The seller adds a function-call key for the buyer and removes it after 30 days; checked on chain with view_access_key."
+      },
+      "appraisal_id": "apr_062aca549faa3b4be3affaaf",
+      "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+      "cached": false,
+      "value_credits": "25",
+      "range": {
+        "low": "20",
+        "high": "30"
+      },
+      "confidence": 0.8,
+      "flags": [
+        "market_price_used",
+        "transferability_risk"
+      ],
+      "verified": {
+        "signature": true,
+        "signature_reasons": [],
+        "attestation": "checked"
+      },
+      "url": "https://v018.x207.boxd.sh/x207/appraisals/apr_062aca549faa3b4be3affaaf"
+    }
+  },
+  "steps": [
+    {
+      "label": "commit_bundle (epoch 183)",
+      "ok": true,
+      "tx": "495RPj6dYSzhjrDKAb579nYQ3iFTNr6YgvrTtZERHzxr",
+      "failure": null,
+      "value": 1
+    },
+    {
+      "label": "register_in_bundle alice -> bob (32 credit)",
+      "ok": true,
+      "tx": "DWihvNecsxbfAPqunioRyRE4xX4vL4gUWTmfw87Mcnno",
+      "failure": null,
+      "value": "32000000"
+    },
+    {
+      "label": "register_in_bundle bob -> dan2 (25 credit)",
+      "ok": true,
+      "tx": "3pZtCh4iuxoVsin9ZKUUZwncMtA7NG7QKPpjtp23ReB6",
+      "failure": null,
+      "value": "25000000"
+    },
+    {
+      "label": "register_in_bundle dan2 -> alice (24 credit)",
+      "ok": true,
+      "tx": "3mCHNfbsep8nTY4b448kFrKQAr3yLiFrQr1EMSJmrzXn",
+      "failure": null,
+      "value": "24000000"
+    },
+    {
+      "label": "close_epoch 183",
+      "ok": true,
+      "tx": "GnvQP6ZdFrEiLV2MwYY6YjkUZ25NhDEYjKYxLy8oXYne",
+      "failure": null,
+      "value": null
+    },
+    {
+      "label": "submit_clearing 183",
+      "ok": true,
+      "tx": "D2or8bye9he79yWFUhgcdmzmF2zMtFThpzCapYpkA1J1",
+      "failure": null,
+      "value": "72000000"
+    },
+    {
+      "label": "commit_epoch 183",
+      "ok": true,
+      "tx": "Hg2dFMCL3TUnWzvd9HzUdcr6t1YYem6Ch55euuzy2bgk",
+      "failure": null,
+      "value": null
+    },
+    {
+      "label": "settle epoch 183 (bob pays 68 USDT)",
+      "ok": true,
+      "tx": "4aaZmgB3CnCCSMkdJnHM6XvaWVB9hjQkgkkgvSxNX799",
+      "failure": null,
+      "value": "68000000"
+    },
+    {
+      "label": "finalize_epoch 183",
+      "ok": true,
+      "tx": "8fHHr9HnckCh4yPAqYZM5nhqzs1BkndK4cfsZhVZtGSi",
+      "failure": null,
+      "value": null
+    },
+    {
+      "label": "claim epoch 183 (alice, near)",
+      "ok": true,
+      "tx": "89UFTiJW8dAJy59JGSqWLj2Eib3Lfw34Gnv8uaeePWJW",
+      "failure": null,
+      "value": "67000000"
+    },
+    {
+      "label": "claim epoch 183 (dan2, near)",
+      "ok": true,
+      "tx": "GYXoFHmfik2bv4yooP5m5a6GRMKkAsyg4PjtdSF1yPbF",
+      "failure": null,
+      "value": "1000000"
+    }
+  ],
+  "epoch": 183,
+  "terms": {
+    "circle": "x207-v018.testnet",
+    "epoch": 183,
+    "legs": [
+      {
+        "payer": "alice.x207-v18-own.testnet",
+        "payee": "bob.x207-v18-own.testnet",
+        "max_amount": "32000000"
+      },
+      {
+        "payer": "bob.x207-v18-own.testnet",
+        "payee": "dan2.x207-v18-own.testnet",
+        "max_amount": "25000000"
+      },
+      {
+        "payer": "dan2.x207-v18-own.testnet",
+        "payee": "alice.x207-v18-own.testnet",
+        "max_amount": "24000000"
+      }
+    ]
+  },
+  "terms_hash": "34052989607d88d0e588d37a1f62ea6b445b7c7439b26d80f31b74895a36fba4",
+  "bundle_id": 1,
+  "result": {
+    "clearing_proposal": {
+      "edges": [
+        {
+          "debtor": "alice.x207-v18-own.testnet",
+          "creditor": "bob.x207-v18-own.testnet",
+          "cleared": "24000000"
+        },
+        {
+          "debtor": "bob.x207-v18-own.testnet",
+          "creditor": "dan2.x207-v18-own.testnet",
+          "cleared": "24000000"
+        },
+        {
+          "debtor": "dan2.x207-v18-own.testnet",
+          "creditor": "alice.x207-v18-own.testnet",
+          "cleared": "24000000"
+        }
+      ],
+      "simulated": {
+        "valid": true,
+        "cleared_total": "72000000",
+        "edge_count": 3,
+        "better_than_current": true,
+        "reason": null
+      }
+    },
+    "obligations_after_clearing": [
+      {
+        "epoch": 183,
+        "debtor": "alice.x207-v18-own.testnet",
+        "creditor": "bob.x207-v18-own.testnet",
+        "cumulative": "32000000",
+        "last_seq": 1,
+        "cleared": "24000000",
+        "obligation": "8000000"
+      },
+      {
+        "epoch": 183,
+        "debtor": "bob.x207-v18-own.testnet",
+        "creditor": "dan2.x207-v18-own.testnet",
+        "cumulative": "25000000",
+        "last_seq": 1,
+        "cleared": "24000000",
+        "obligation": "1000000"
+      },
+      {
+        "epoch": 183,
+        "debtor": "dan2.x207-v18-own.testnet",
+        "creditor": "alice.x207-v18-own.testnet",
+        "cumulative": "24000000",
+        "last_seq": 1,
+        "cleared": "24000000",
+        "obligation": "0"
+      }
+    ],
+    "positions_at_commit": [
+      {
+        "epoch": 183,
+        "account_id": "bob.x207-v18-own.testnet",
+        "net": "-68000000",
+        "role": "debtor",
+        "status": "due",
+        "amount": "68000000",
+        "recovered": "0",
+        "payment_deadline": "1794504710442336994",
+        "updated_at_block": 277392631
+      },
+      {
+        "epoch": 183,
+        "account_id": "alice.x207-v18-own.testnet",
+        "net": "67000000",
+        "role": "creditor",
+        "status": "claimable",
+        "amount": "67000000",
+        "recovered": "0",
+        "payment_deadline": "1794504710442336994",
+        "updated_at_block": 277392631
+      },
+      {
+        "epoch": 183,
+        "account_id": "dan2.x207-v18-own.testnet",
+        "net": "1000000",
+        "role": "creditor",
+        "status": "claimable",
+        "amount": "1000000",
+        "recovered": "0",
+        "payment_deadline": "1794504710442336994",
+        "updated_at_block": 277392631
+      }
+    ],
+    "legs": [
+      {
+        "payer": "alice",
+        "payee": "bob",
+        "payer_takes": "license:software-nft",
+        "appraisal_id": "apr_d2e83a701cbcbed1309a46fa",
+        "gross_credit": "32",
+        "cleared_credit": "24",
+        "residue_credit": "8"
+      },
+      {
+        "payer": "bob",
+        "payee": "dan2",
+        "payer_takes": "near-rpc:access",
+        "appraisal_id": "apr_062aca549faa3b4be3affaaf",
+        "gross_credit": "25",
+        "cleared_credit": "24",
+        "residue_credit": "1"
+      },
+      {
+        "payer": "dan2",
+        "payee": "alice",
+        "payer_takes": "maps:geocoding-quota",
+        "appraisal_id": "apr_4d97a431de9635c442083c67",
+        "gross_credit": "24",
+        "cleared_credit": "24",
+        "residue_credit": "0"
+      }
+    ],
+    "totals": {
+      "gross_credit": "81",
+      "cleared_credit": "72",
+      "residue_credit": "9",
+      "usdt_due_ring_only": "8",
+      "usdt_due_ring_only_share_of_gross_bps": 987,
+      "usdt_settled_on_chain": "68"
+    },
+    "net_per_member": {
+      "alice": {
+        "account": "alice.x207-v18-own.testnet",
+        "net_credit": "-8",
+        "net_units": "-8000000"
+      },
+      "bob": {
+        "account": "bob.x207-v18-own.testnet",
+        "net_credit": "7",
+        "net_units": "7000000"
+      },
+      "dan2": {
+        "account": "dan2.x207-v18-own.testnet",
+        "net_credit": "1",
+        "net_units": "1000000"
+      }
+    },
+    "epoch": {
+      "number": 183,
+      "phase": "finalized",
+      "total_obligation": "156000000",
+      "total_cleared": "72000000",
+      "pool": "0",
+      "shortfall": "0"
+    },
+    "positions_final": [
+      {
+        "epoch": 183,
+        "account_id": "bob.x207-v18-own.testnet",
+        "net": "-68000000",
+        "role": "debtor",
+        "status": "paid",
+        "amount": "68000000",
+        "recovered": "0",
+        "payment_deadline": "1794504710442336994",
+        "updated_at_block": 277392642
+      },
+      {
+        "epoch": 183,
+        "account_id": "alice.x207-v18-own.testnet",
+        "net": "67000000",
+        "role": "creditor",
+        "status": "claimed",
+        "amount": "67000000",
+        "recovered": "0",
+        "payment_deadline": "1794504710442336994",
+        "updated_at_block": 277394187
+      },
+      {
+        "epoch": 183,
+        "account_id": "dan2.x207-v18-own.testnet",
+        "net": "1000000",
+        "role": "creditor",
+        "status": "claimed",
+        "amount": "1000000",
+        "recovered": "0",
+        "payment_deadline": "1794504710442336994",
+        "updated_at_block": 277394197
+      }
+    ],
+    "transactions": [
+      {
+        "step": "commit_bundle (epoch 183)",
+        "tx": "495RPj6dYSzhjrDKAb579nYQ3iFTNr6YgvrTtZERHzxr",
+        "explorer": "https://testnet.nearblocks.io/txns/495RPj6dYSzhjrDKAb579nYQ3iFTNr6YgvrTtZERHzxr"
+      },
+      {
+        "step": "register_in_bundle alice -> bob (32 credit)",
+        "tx": "DWihvNecsxbfAPqunioRyRE4xX4vL4gUWTmfw87Mcnno",
+        "explorer": "https://testnet.nearblocks.io/txns/DWihvNecsxbfAPqunioRyRE4xX4vL4gUWTmfw87Mcnno"
+      },
+      {
+        "step": "register_in_bundle bob -> dan2 (25 credit)",
+        "tx": "3pZtCh4iuxoVsin9ZKUUZwncMtA7NG7QKPpjtp23ReB6",
+        "explorer": "https://testnet.nearblocks.io/txns/3pZtCh4iuxoVsin9ZKUUZwncMtA7NG7QKPpjtp23ReB6"
+      },
+      {
+        "step": "register_in_bundle dan2 -> alice (24 credit)",
+        "tx": "3mCHNfbsep8nTY4b448kFrKQAr3yLiFrQr1EMSJmrzXn",
+        "explorer": "https://testnet.nearblocks.io/txns/3mCHNfbsep8nTY4b448kFrKQAr3yLiFrQr1EMSJmrzXn"
+      },
+      {
+        "step": "close_epoch 183",
+        "tx": "GnvQP6ZdFrEiLV2MwYY6YjkUZ25NhDEYjKYxLy8oXYne",
+        "explorer": "https://testnet.nearblocks.io/txns/GnvQP6ZdFrEiLV2MwYY6YjkUZ25NhDEYjKYxLy8oXYne"
+      },
+      {
+        "step": "submit_clearing 183",
+        "tx": "D2or8bye9he79yWFUhgcdmzmF2zMtFThpzCapYpkA1J1",
+        "explorer": "https://testnet.nearblocks.io/txns/D2or8bye9he79yWFUhgcdmzmF2zMtFThpzCapYpkA1J1"
+      },
+      {
+        "step": "commit_epoch 183",
+        "tx": "Hg2dFMCL3TUnWzvd9HzUdcr6t1YYem6Ch55euuzy2bgk",
+        "explorer": "https://testnet.nearblocks.io/txns/Hg2dFMCL3TUnWzvd9HzUdcr6t1YYem6Ch55euuzy2bgk"
+      },
+      {
+        "step": "settle epoch 183 (bob pays 68 USDT)",
+        "tx": "4aaZmgB3CnCCSMkdJnHM6XvaWVB9hjQkgkkgvSxNX799",
+        "explorer": "https://testnet.nearblocks.io/txns/4aaZmgB3CnCCSMkdJnHM6XvaWVB9hjQkgkkgvSxNX799"
+      },
+      {
+        "step": "finalize_epoch 183",
+        "tx": "8fHHr9HnckCh4yPAqYZM5nhqzs1BkndK4cfsZhVZtGSi",
+        "explorer": "https://testnet.nearblocks.io/txns/8fHHr9HnckCh4yPAqYZM5nhqzs1BkndK4cfsZhVZtGSi"
+      },
+      {
+        "step": "claim epoch 183 (alice, near)",
+        "tx": "89UFTiJW8dAJy59JGSqWLj2Eib3Lfw34Gnv8uaeePWJW",
+        "explorer": "https://testnet.nearblocks.io/txns/89UFTiJW8dAJy59JGSqWLj2Eib3Lfw34Gnv8uaeePWJW"
+      },
+      {
+        "step": "claim epoch 183 (dan2, near)",
+        "tx": "GYXoFHmfik2bv4yooP5m5a6GRMKkAsyg4PjtdSF1yPbF",
+        "explorer": "https://testnet.nearblocks.io/txns/GYXoFHmfik2bv4yooP5m5a6GRMKkAsyg4PjtdSF1yPbF"
+      }
+    ],
+    "links": {
+      "dashboard_epoch": "https://x207.vercel.app/stats?epoch=183&circle=v018",
+      "dashboard_report": "https://x207.vercel.app/reports?epoch=183&circle=v018",
+      "api_epoch_metrics": "https://v018.x207.boxd.sh/x207/circles/agents-main/epochs/183/metrics",
+      "api_bundles": "https://v018.x207.boxd.sh/x207/circles/agents-main/bundles"
+    },
+    "other_obligations_in_epoch": [
+      {
+        "epoch": 183,
+        "debtor": "bob.x207-v18-own.testnet",
+        "creditor": "alice.x207-v18-own.testnet",
+        "cumulative": "75000000",
+        "last_seq": 1,
+        "cleared": "0",
+        "obligation": "75000000"
+      }
+    ]
+  },
+  "finished_at": "2026-11-12T18:03:43.005Z"
+}
