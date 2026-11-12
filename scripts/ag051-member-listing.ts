@@ -5,6 +5,7 @@
 //   X207_MEMBER_KEYS_FILE=<keys.json> X207_MEMBER=alice X207_MEMBER_ACCOUNT=alice.example.testnet X207_CONTRACT_ID=<circle contract> \
 //   X207_BACKEND_URL=https://<backend> X207_SIGNED_OUT=<out.json> node scripts/ag051-member-listing.ts
 // The keys file maps a member name to `{ voucher: "ed25519:..." }`. X207_APPRAISER_URL defaults to X207_BACKEND_URL.
+// X207_LISTING_EXPIRES_AT (ISO time or unix seconds) sets when the listing expires; without it the agent's default applies (24 hours).
 import { readFileSync, writeFileSync } from "node:fs";
 import { listingHash, voucherPublicKey } from "@x207/core";
 import { AppraiserClient } from "../shared/appraiser.ts";
@@ -23,6 +24,10 @@ const contractId = need("X207_CONTRACT_ID");
 const backend = need("X207_BACKEND_URL").replace(/\/$/, "");
 const out = need("X207_SIGNED_OUT");
 const circle = process.env.X207_CIRCLE_ID ?? "agents-main";
+const startedAt = Math.floor(Date.now() / 1000);
+const expiresRaw = process.env.X207_LISTING_EXPIRES_AT;
+const expiresAt = expiresRaw ? (/^\d+$/.test(expiresRaw) ? Number(expiresRaw) : Math.floor(Date.parse(expiresRaw) / 1000)) : undefined;
+if (expiresAt !== undefined && !(expiresAt > startedAt)) throw new Error(`X207_LISTING_EXPIRES_AT "${expiresRaw}" is not a time in the future`);
 
 const entry = (JSON.parse(readFileSync(keysFile, "utf8")) as Record<string, { voucher?: string }>)[member];
 if (!entry?.voucher?.startsWith("ed25519:")) throw new Error(`no voucher key for member "${member}" in the keys file`);
@@ -42,9 +47,11 @@ const agent = new PolicyAgent({
   identity: { accountId: account, voucherSecretKey: secretKey, voucherPublicKey: publicKey, policy: { maxPerCall: "100000", maxPerEpoch: "10000000" } },
   book,
   contractId,
-  now: () => Math.floor(Date.now() / 1000),
+  // a fixed clock, so that expires_at = startedAt + listingTtlSeconds is exactly the time asked for
+  now: () => startedAt,
   policy: {
     ...DEFAULT_BARTER_POLICY,
+    ...(expiresAt !== undefined ? { listingTtlSeconds: expiresAt - startedAt } : {}),
     // the same holding as ag051-appraised-listing.ts: 10 bundles of 10000 geocoding calls, 7.5 credit each (75 in total)
     holdings: [{ assetType: "api_quota", assetClass: "B", quantity: 10, unitValue: "7500000" }],
     needs: [{ assetType: "service:summarize-calls", assetClass: "D", quantity: 10, maxUnitValue: "5000000" }],
