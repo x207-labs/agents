@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import { generateVoucherKeypair } from "@x207/core";
 import { createAgentBuyer } from "../shared/x207.ts";
 import type { AgentIdentity } from "../shared/identity.ts";
-import { SDK_TOO_OLD, SDK_TOO_OLD_REASON } from "./installed-sdk.ts";
 
 const keys = generateVoucherKeypair();
 const identity: AgentIdentity = { accountId: "buyer.x207-circle.test.near", voucherSecretKey: keys.secretKey, voucherPublicKey: keys.publicKey, policy: { maxPerCall: "100000", maxPerEpoch: "50000000" } };
@@ -25,10 +24,9 @@ function seller(payTo: string, epoch: number) {
   return { fetchStub, seen };
 }
 
-// AG-053: the `accept` option of the buyer exists in the workspace @x207/scheme only; the registry copy installed in a repository cloned alone predates it (it follows any 402).
+// The `accept` option of the buyer exists from @x207/scheme 0.0.3 (the registry 0.0.2 follows any 402).
 describe("AG-045 buyer accept", () => {
-  it("TC-AG-045-02 a payee outside the allowed list or an epoch other than the open one is refused; the allowed one is paid", async (ctx) => {
-    if (SDK_TOO_OLD) ctx.skip(SDK_TOO_OLD_REASON);
+  it("TC-AG-045-02 a payee outside the allowed list or an epoch other than the open one is refused; the allowed one is paid", async () => {
     const accept = { circles: ["x207-circle.test.near"], payees: ["good.x207-circle.test.near"], currentEpoch: async () => 5 };
     const evil = seller("evil.x207-circle.test.near", 5);
     await expect(createAgentBuyer(identity, { fetch: evil.fetchStub, accept })("https://seller.example/api/x")).rejects.toThrow(/not one that this buyer pays/);
