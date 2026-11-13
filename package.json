@@ -1,7 +1,7 @@
 {
   "name": "@x207/agents",
   "version": "0.0.1",
-  "description": "x207 demo agents: six agents that buy and sell services over x402 with x207 credit settlement",
+  "description": "Demo agents of the x207 barter protocol on NEAR: six agents that trade services over x402 on credit, settled by multilateral clearing",
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",

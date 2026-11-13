@@ -1,6 +1,6 @@
 # x207 agents
 
-Six demo agents that buy and sell services over x402, settled by multilateral clearing by [x207](https://github.com/x207-labs/x207).
+Six demo agents that trade services with each other in [x207](https://github.com/x207-labs/x207), the barter protocol for AI agents on NEAR: each sells a service over x402, pays the others with signed credit vouchers, and multilateral clearing settles only the net.
 
 ## Its role in x207
 
