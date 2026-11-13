@@ -6,6 +6,15 @@ Date: 2026-11-12. Contract `x207-v018.testnet`, circle `agents-main`, settlement
 
 Three member agents each hold a different digital asset. Each asset is valued by the live appraiser, and the three trades form one ring: alice → bob → dan2 → alice. The trades are paid in credit, not cash. At the end of the epoch, clearing cancels the loop, and only the net difference moves as USDT.
 
+## Who ran it
+
+One script, run by one operator, played all three members. Each member has its own NEAR account, its own access key and its own voucher key, and the script signs each member's part with that member's keys only:
+
+- **Voucher keys.** The bundle carries one signature per member, and each `register_in_bundle` carries the payer's voucher signature, made with that payer's voucher key.
+- **Transactions.** The permissionless calls are sent by one member acting as relayer: the one with the most NEAR, which was dan2. So dan2 signed the transactions of `commit_bundle`, the three `register_in_bundle`, `close_epoch`, `submit_clearing`, `commit_epoch`, `finalize_epoch` and its own claim. alice signed her USDT payment (`ft_transfer_call`), and bob signed his claim.
+
+This shows the contract's rules on real accounts and keys. It does not show three independent operators agreeing on a trade.
+
 ## Assets and appraisals
 
 Each value comes from `POST https://v018.x207.boxd.sh/x207/appraise`. Each appraisal's signature was verified and its attestation was checked.
@@ -37,7 +46,7 @@ The ring cancels 24 credit on every leg, the value of its smallest leg. The valu
 | bob | +7 | claims 7 ([claim tx](https://testnet.nearblocks.io/txns/9LhQ5hrQn92cy3X4ikqEWLxn3AcTDtnXtGZPaH7Y4NK)) |
 | dan2 | +1 | claims 1 ([claim tx](https://testnet.nearblocks.io/txns/3b6L485sPSWuWVLW3ojf1PppRTEHDdU27R4z6coqcL5L)) |
 
-81 credit of trade settled with **8 USDT moved**, 9.9% of gross. One payment of 8 replaces three payments totalling 81. The leg residues add up to 9, but bob has 1 in and 8 out, so the net is what moves. No other voucher was registered in epoch 184 (`other_obligations_in_epoch` is empty). The epoch holds the ring only.
+The value that moves drops from **81 to 8 USDT**, 9.9% of gross. The number of transfers does not drop: one payment in (alice, 8) and two claims out (bob 7, dan2 1) take the place of three trade payments. The leg residues add up to 9, but bob has 1 in and 8 out, so the net is what moves. No other voucher was registered in epoch 184 (`other_obligations_in_epoch` is empty). The epoch holds the ring only.
 
 ## Transactions (epoch 184)
 
@@ -65,7 +74,7 @@ Run time: 17:18 to 18:02 UTC. Most of it is the epoch schedule: the 1800 s epoch
 
 ## Earlier run: epoch 183 (not used as the main evidence)
 
-The first run ([`demo-barter-cycle-epoch183.json`](demo-barter-cycle-epoch183.json)) completed every step with the same ring and the same figures: 81 gross, 72 cleared, residues 8/1/0. In the same epoch, another session also registered a 75-credit voucher bob → alice, signed by alice. The transactions were [`Dq9zmg4dTeK7M17f24wcwcGGEgtiefakrrn9A66aQXev`](https://testnet.nearblocks.io/txns/Dq9zmg4dTeK7M17f24wcwcGGEgtiefakrrn9A66aQXev) and [`GuQjUumDLVu86PqX5TqHDri1BrszuHgi7uxbH3PQfiRQ`](https://testnet.nearblocks.io/txns/GuQjUumDLVu86PqX5TqHDri1BrszuHgi7uxbH3PQfiRQ). That made the epoch total 156 credit, with bob paying 68 USDT ([settle tx](https://testnet.nearblocks.io/txns/4aaZmgB3CnCCSMkdJnHM6XvaWVB9hjQkgkkgvSxNX799)). The ring itself still netted to 8. The script now records such extra vouchers under `other_obligations_in_epoch`, and the run was repeated in epoch 184, where there were none. Dashboard: https://x207.vercel.app/stats?epoch=183&circle=v018
+The first run ([`demo-barter-cycle-epoch183.json`](demo-barter-cycle-epoch183.json)) completed every step with the same ring and the same figures: 81 gross, 72 cleared, residues 8/1/0. In the same epoch, the contract's overspend test ([`ct132-overspend-run.json`](https://github.com/x207-labs/contracts/blob/main/docs/testnet-epochs/ct132-overspend-run.json) in the contracts repository) ran on the same circle with bob as payer. Its first voucher, bob → alice for 75 credit, was accepted ([`GuQjUumDLVu86PqX5TqHDri1BrszuHgi7uxbH3PQfiRQ`](https://testnet.nearblocks.io/txns/GuQjUumDLVu86PqX5TqHDri1BrszuHgi7uxbH3PQfiRQ)). Its second, bob → dan3 for 75 credit, was refused by the contract with `ERR_INSUFFICIENT_CREDIT` ([`Dq9zmg4dTeK7M17f24wcwcGGEgtiefakrrn9A66aQXev`](https://testnet.nearblocks.io/txns/Dq9zmg4dTeK7M17f24wcwcGGEgtiefakrrn9A66aQXev)). The accepted voucher made the epoch total 156 credit, with bob paying 68 USDT ([settle tx](https://testnet.nearblocks.io/txns/4aaZmgB3CnCCSMkdJnHM6XvaWVB9hjQkgkkgvSxNX799)). The ring itself still netted to 8. The script now records such extra vouchers under `other_obligations_in_epoch`, and the run was repeated in epoch 184, where there were none. Dashboard: https://x207.vercel.app/stats?epoch=183&circle=v018
 
 ## Running it again
 
