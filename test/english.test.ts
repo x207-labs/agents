@@ -12,13 +12,15 @@ const ROOTS: readonly string[] = ["agents", "config", "onboarding", "scenario", 
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git", "target", "python", "coverage"]);
 const SKIP_FILES = new Set(["english.test.ts"]);
 const WORDS = [
-  "dengan", "yang", "tidak", "untuk", "dari", "sudah", "belum", "atau", "harus", "bukan", "karena", "sebelum", "setelah", "adalah", "dapat", "akan", "pada", "jika", "bila",
+  "dengan", "yang", "tidak", "untuk", "dari", "sudah", "belum", "atau", "dan", "harus", "bukan", "karena", "sebelum", "setelah", "adalah", "dapat", "akan", "pada", "jika", "bila",
   "saat", "gagal", "berhasil", "kunci", "penjual", "pembeli", "jendela", "anggota", "kontrak", "lisensi", "pesanan", "kode", "sengketa", "penerbit", "jaminan", "tonggak", "penawaran",
   "batas", "nilai", "simpan", "hapus", "kirim", "unduh", "periksa", "siapkan", "tagihan", "bayar", "dibayar", "ditolak", "dikirim", "pengguna", "akun", "diperlukan", "salah", "benar",
 ];
 const PATTERN = new RegExp(`(?<![A-Za-z_])(${WORDS.join("|")})(?![A-Za-z_])`, "i");
-// AG-053: "dan" ("and") is also the name of a ring member (`dan`, `dan2` in the barter demo), so it counts only as a lowercase word with a space on both sides.
-const AND_WORD = /(?<=\s)(dan)(?=\s)/;
+// AG-053: names of agent accounts on testnet that contain a listed word ("dan", "and"): the ring member `dan2` of the barter demo (`dan2.x207-v18-own.testnet`) and `dan3` of the
+// overspend run it cites. They are removed before the scan, as whole names only; the word itself is still found everywhere else.
+const AGENT_NAMES: readonly string[] = ["dan2", "dan3"];
+const NAMES = new RegExp(`(?<![A-Za-z0-9_])(${AGENT_NAMES.join("|")})(?![A-Za-z0-9_])`, "g");
 
 function files(dir: string): string[] {
   const stat = statSync(dir, { throwIfNoEntry: false });
@@ -45,7 +47,7 @@ describe("SD-078 the agents repository is in English", () => {
     for (const r of ROOTS) {
       for (const path of files(join(root, r))) {
         withoutComments(path, readFileSync(path, "utf8")).split("\n").forEach((line, i) => {
-          const m = PATTERN.exec(line) ?? AND_WORD.exec(line);
+          const m = PATTERN.exec(line.replace(NAMES, " "));
           if (m) found.push(`${path.slice(root.length + 1)}:${i + 1}: "${m[1]}" in ${line.trim().slice(0, 100)}`);
         });
       }
