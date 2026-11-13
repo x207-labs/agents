@@ -40,7 +40,7 @@ An agent listens on `127.0.0.1` (AG-038). `AGENT_HOST` picks another interface, 
 
 ## Dependencies
 
-`@x207/core` and `@x207/scheme` are not installed from npm: the registry holds `@x207/core@0.0.2`, which carries contract ABI 0.0.15, while the contract in use is 0.0.17 (AG-040; on the branch `p1-0.0.18` it is 0.0.18, the sale of a NEAR account, AG-050). The agents run inside the umbrella workspace (`x207-labs/x207`, `npm ci` at its root), where the packages are linked from `sdk/packages/`. The own `package-lock.json` of this folder (like the one of `solver`) still names the registry copy: the pins check wants a committed lockfile in every repo, and it is only used by a lone `npm ci` here, which is not how CI or the jury run it. `test/core-abi.test.ts` fails if the resolved `@x207/core` is not the workspace one at the ABI in use (0.0.17 on main, 0.0.18 on the branch `p1-0.0.18`).
+`@x207/core` and `@x207/scheme` are not installed from npm: the registry holds `@x207/core@0.0.2`, which carries contract ABI 0.0.15, while the contract in use is 0.0.17 (AG-040; on the branch `p1-0.0.18` it is 0.0.18, the sale of a NEAR account, AG-050). The agents run inside the umbrella workspace (`x207-labs/x207`, `npm ci` at its root), where the packages are linked from `sdk/packages/`. The own `package-lock.json` of this folder (like the one of `solver`) still names the registry copy: the pins check wants a committed lockfile in every repo, and it is only used by a lone `npm ci` here, which is not how CI or the jury run it. `test/core-abi.test.ts` fails if the resolved `@x207/core` is not the workspace one at the ABI in use (0.0.18). When this repository is cloned alone, the installed core is the older registry copy, so that test and `TC-AG-045-02` (the `accept` option of the buyer, which the registry `@x207/scheme` lacks) skip with the reason "installed @x207/core has interface 0.0.15, this test needs 0.0.18" until a newer core is published.
 
 ## Try it
 
@@ -62,7 +62,7 @@ npm run typecheck
 npm run test:sandbox    # X207_SANDBOX=1, needs near-sandbox (run from the umbrella)
 ```
 
-`npm install` works on this repository alone, and so does the agent above. The end-to-end tests do not: `test/*.sandbox.test.ts` and `test/stack.ts` import the test support of the SDK, the facilitator and the umbrella scripts. On its own, `npm test` runs the other test files and reports those eight as failed, and `npm run typecheck` reports their imports. Run the tests from a recursive checkout of the [umbrella](https://github.com/x207-labs/x207) (`npm ci`, then `npm test -w @x207/agents`); the agents' source itself uses only the public packages (`npm run check:imports`).
+`npm install` works on this repository alone, and so does the agent above. The end-to-end tests do not: `test/*.sandbox.test.ts` and `test/stack.ts` import the test support of the SDK, the facilitator and the umbrella scripts. On its own, `npm test` runs the other test files and skips those nine (`vitest.config.ts` swaps each for a skipped placeholder that names what is missing), and `npm run typecheck` reports their imports. Run the tests from a recursive checkout of the [umbrella](https://github.com/x207-labs/x207) (`npm ci`, then `npm test -w @x207/agents`); the agents' source itself uses only the public packages (`npm run check:imports`).
 
 Node 22.22.2 or newer runs the `.ts` files directly (type stripping is on by default since Node 22.18), so there is no build step. Copy `.env.example` to `.env` and fill it by hand; `.env` is git-ignored.
 
