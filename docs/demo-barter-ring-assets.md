@@ -10,7 +10,7 @@ The AG-052 ring ([`demo-barter-cycle.md`](demo-barter-cycle.md), epoch 184) move
 2. The seller hands the NFT to the circle (`nft_transfer_call` on the NFT contract). The circle holds it: event `escrow_held`, owner of the token = `x207-v018.testnet`.
 3. The buyer calls `complete_escrow` with a voucher of the price. In the same call the voucher is registered (event `voucher_registered`) and the circle sends the NFT to the buyer. `on_escrow_resolved` makes the grant active (event `grant_activated`), and the owner of the token is now the buyer.
 
-The three purchases fall in one epoch (245), so the three debts form one cycle. At the end of the epoch, clearing nets 24 credit on every edge. Only the residue, 8 credit, moves in USDT. The three assets moved in full.
+The three purchases fall in one epoch (245), so the three debts form one cycle. At the end of the epoch, clearing nets 24 credit on every edge. 9 credit of debt is left (dan2 owes bob 8, alice owes dan2 1), and netting turns it into 8 mock USDT of payments: alice pays 1, dan2 pays 7, bob claims 8. The three assets moved in full.
 
 ## Who ran it
 

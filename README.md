@@ -56,7 +56,7 @@ Mock mode answers `{"agent":"summarizer","result":"[mock:summarizer] hello"}`. T
 
 Two barter rings ran on testnet (`x207-v018.testnet`, mock USDT, one operator played all three members):
 
-- [`docs/demo-barter-cycle.md`](docs/demo-barter-cycle.md), epoch 184 (`scripts/demo-barter-cycle.ts`). Three appraised assets were traded in one signed bundle; 72 of 81 credit cleared. Only credit moved.
+- [`docs/demo-barter-cycle.md`](docs/demo-barter-cycle.md), epoch 184 (`scripts/demo-barter-cycle.ts`). Three appraised assets were traded in one signed bundle; 72 of 81 credit cleared. No asset changed hands.
 - [`docs/demo-barter-ring-assets.md`](docs/demo-barter-ring-assets.md), epoch 245 (`scripts/demo-barter-ring-assets.ts`). Three mock NFTs moved to their buyers through contract escrow, at prices the operator set; 72 of 81 credit cleared.
 
 ## Test
