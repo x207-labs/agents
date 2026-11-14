@@ -1,0 +1,1288 @@
+{
+  "item": "AG-055",
+  "contract": "x207-v018.testnet",
+  "circle": "agents-main",
+  "nft_contract": "nft.x207-b1-aux.testnet",
+  "started_at": "2026-11-13T23:41:57.925Z",
+  "run_tag": "1794613317",
+  "members": [
+    {
+      "name": "alice",
+      "account": "alice.x207-v18-own.testnet",
+      "sells": "license:software-nft"
+    },
+    {
+      "name": "bob",
+      "account": "bob.x207-v18-own.testnet",
+      "sells": "ticket:event-nft"
+    },
+    {
+      "name": "dan2",
+      "account": "dan2.x207-v18-own.testnet",
+      "sells": "game:item-nft"
+    }
+  ],
+  "appraisals": {
+    "alice": {
+      "source": "appraiser",
+      "holder": "alice.x207-v18-own.testnet",
+      "catalog_no": 5,
+      "asset": {
+        "asset_type": "license:software-nft",
+        "asset_class": "A",
+        "quantity": 1,
+        "scope": "One transferable 12-month seat of a code editor license, held as an NFT; the holder of the NFT is the licensee",
+        "provider": "Editor Pro (demo issuer, NFT on NEAR testnet)",
+        "duration_days": 365,
+        "market_price_credits": "24",
+        "description": "Seat license as an NFT on NEAR testnet (a mock NFT contract stands for the issuer); the token moves to the buyer through the escrow of the circle."
+      },
+      "appraisal_id": "apr_6b39593ef870414295e68916",
+      "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+      "cached": false,
+      "value_credits": "0",
+      "range": {
+        "low": "0",
+        "high": "0"
+      },
+      "confidence": 0.1,
+      "flags": [
+        "provider_unknown",
+        "no_market_price"
+      ],
+      "verified": {
+        "signature": true,
+        "signature_reasons": [],
+        "attestation": "checked"
+      },
+      "url": "https://v018.x207.boxd.sh/x207/appraisals/apr_6b39593ef870414295e68916"
+    },
+    "bob": {
+      "source": "appraiser",
+      "holder": "bob.x207-v18-own.testnet",
+      "catalog_no": 2,
+      "asset": {
+        "asset_type": "ticket:event-nft",
+        "asset_class": "A",
+        "quantity": 1,
+        "scope": "One admission ticket to a one-day developer conference, held as an NFT; the holder of the NFT gets in",
+        "provider": "NEAR builders day (demo organizer, NFT on NEAR testnet)",
+        "duration_days": 7,
+        "market_price_credits": "32",
+        "description": "Event ticket as an NFT on NEAR testnet (a mock NFT contract stands for the organizer); the token moves to the buyer through the escrow of the circle."
+      },
+      "appraisal_id": "apr_46f4cf3721dbf5654341ae6b",
+      "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+      "cached": false,
+      "value_credits": "0",
+      "range": {
+        "low": "0",
+        "high": "0"
+      },
+      "confidence": 0.1,
+      "flags": [
+        "no_market_price",
+        "provider_unknown",
+        "scope_unclear"
+      ],
+      "verified": {
+        "signature": true,
+        "signature_reasons": [],
+        "attestation": "checked"
+      },
+      "url": "https://v018.x207.boxd.sh/x207/appraisals/apr_46f4cf3721dbf5654341ae6b"
+    },
+    "dan2": {
+      "source": "appraiser",
+      "holder": "dan2.x207-v18-own.testnet",
+      "catalog_no": 3,
+      "asset": {
+        "asset_type": "game:item-nft",
+        "asset_class": "A",
+        "quantity": 1,
+        "scope": "One rare sword of an on-chain dungeon game, held as an NFT; the holder of the NFT can equip it in the game",
+        "provider": "Dungeons (demo game, NFT on NEAR testnet)",
+        "duration_days": null,
+        "market_price_credits": "25",
+        "description": "Game item as an NFT on NEAR testnet (a mock NFT contract stands for the game); the token moves to the buyer through the escrow of the circle."
+      },
+      "appraisal_id": "apr_5e4d612bb36446df7d765a7a",
+      "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+      "cached": false,
+      "value_credits": "0.5",
+      "range": {
+        "low": "0.1",
+        "high": "1"
+      },
+      "confidence": 0.3,
+      "flags": [
+        "price_far_from_market",
+        "provider_unknown",
+        "transferability_risk"
+      ],
+      "verified": {
+        "signature": true,
+        "signature_reasons": [],
+        "attestation": "checked"
+      },
+      "url": "https://v018.x207.boxd.sh/x207/appraisals/apr_5e4d612bb36446df7d765a7a"
+    }
+  },
+  "listings": {
+    "alice": {
+      "seller": "alice",
+      "buyer": "bob",
+      "asset_type": "license:software-nft",
+      "catalog_no": 5,
+      "token_id": "ag055-1794613317-license",
+      "owners": {
+        "before_trade": "alice.x207-v18-own.testnet",
+        "in_escrow": "x207-v018.testnet",
+        "after_trade": "bob.x207-v18-own.testnet"
+      },
+      "grant_id": 9,
+      "price_units": "24000000",
+      "price_source": "fixed"
+    },
+    "bob": {
+      "seller": "bob",
+      "buyer": "dan2",
+      "asset_type": "ticket:event-nft",
+      "catalog_no": 2,
+      "token_id": "ag055-1794613317-ticket",
+      "owners": {
+        "before_trade": "bob.x207-v18-own.testnet",
+        "in_escrow": "x207-v018.testnet",
+        "after_trade": "dan2.x207-v18-own.testnet"
+      },
+      "grant_id": 10,
+      "price_units": "32000000",
+      "price_source": "fixed"
+    },
+    "dan2": {
+      "seller": "dan2",
+      "buyer": "alice",
+      "asset_type": "game:item-nft",
+      "catalog_no": 3,
+      "token_id": "ag055-1794613317-game-item",
+      "owners": {
+        "before_trade": "dan2.x207-v18-own.testnet",
+        "in_escrow": "x207-v018.testnet",
+        "after_trade": "alice.x207-v18-own.testnet"
+      },
+      "grant_id": 11,
+      "price_units": "25000000",
+      "price_source": "fixed"
+    }
+  },
+  "steps": [
+    {
+      "label": "set_asset_class ticket:event-nft",
+      "ok": true,
+      "tx": "FZEwSumTmmTSPnUkCsegUWrF2SvyoNXau233cWrNJ5R7",
+      "signer": "x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "set_asset_class",
+      "failure": null,
+      "value": null,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "asset_class_set",
+          "data": [
+            {
+              "asset_type": "ticket:event-nft",
+              "class": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "set_asset_class game:item-nft",
+      "ok": true,
+      "tx": "HcE4uXMEXtU1qXf43fEBtSyXe7xcq8m6VxjSJk9HHBTv",
+      "signer": "x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "set_asset_class",
+      "failure": null,
+      "value": null,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "asset_class_set",
+          "data": [
+            {
+              "asset_type": "game:item-nft",
+              "class": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "set_asset_class license:software-nft",
+      "ok": true,
+      "tx": "23RSGUUwMfqSMmuX86vCNdKQzoiLnT92L4ijV7FPgPLw",
+      "signer": "x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "set_asset_class",
+      "failure": null,
+      "value": null,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "asset_class_set",
+          "data": [
+            {
+              "asset_type": "license:software-nft",
+              "class": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "nft_mint ag055-1794613317-license to alice",
+      "ok": true,
+      "tx": "DSwRmXfsx5BFVuaKqR2cRjwHuM1RXBYYWeNZwpwTaYyh",
+      "signer": "dan2.x207-v18-own.testnet",
+      "receiver": "nft.x207-b1-aux.testnet",
+      "method": "nft_mint",
+      "failure": null,
+      "value": null,
+      "events": []
+    },
+    {
+      "label": "offer_grant alice (license:software-nft ag055-1794613317-license, 24 credit)",
+      "ok": true,
+      "tx": "EpHVhsBwPF8mcinxr1auz3AjYkmTSsNjJMWjxrGXqek6",
+      "signer": "alice.x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "offer_grant",
+      "failure": null,
+      "value": 9,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "grant_offered",
+          "data": [
+            {
+              "grant_id": 9,
+              "asset_type": "license:software-nft",
+              "grantor": "alice.x207-v18-own.testnet",
+              "class": "A",
+              "unit": "once",
+              "unit_price": "24000000",
+              "expires_at": "1794635015000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "nft_transfer_call alice ag055-1794613317-license -> escrow of grant 9",
+      "ok": true,
+      "tx": "34szXeLQstDGusqc8YhpcCQ3XRFnSjQtVyJCBhXXp98v",
+      "signer": "alice.x207-v18-own.testnet",
+      "receiver": "nft.x207-b1-aux.testnet",
+      "method": "nft_transfer_call",
+      "failure": null,
+      "value": true,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "escrow_held",
+          "data": [
+            {
+              "grant_id": 9,
+              "nft_contract": "nft.x207-b1-aux.testnet",
+              "token_id": "ag055-1794613317-license"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "nft_mint ag055-1794613317-ticket to bob",
+      "ok": true,
+      "tx": "9dLVK4Hh4hrHsUoumaUfNdzoPpeQPMf6Tj3cGoPCxPkn",
+      "signer": "dan2.x207-v18-own.testnet",
+      "receiver": "nft.x207-b1-aux.testnet",
+      "method": "nft_mint",
+      "failure": null,
+      "value": null,
+      "events": []
+    },
+    {
+      "label": "offer_grant bob (ticket:event-nft ag055-1794613317-ticket, 32 credit)",
+      "ok": true,
+      "tx": "94CA4SbxbrYQhnWxqXpR91znfm5VhJYs7nyvENdyB9vu",
+      "signer": "bob.x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "offer_grant",
+      "failure": null,
+      "value": 10,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "grant_offered",
+          "data": [
+            {
+              "grant_id": 10,
+              "asset_type": "ticket:event-nft",
+              "grantor": "bob.x207-v18-own.testnet",
+              "class": "A",
+              "unit": "once",
+              "unit_price": "32000000",
+              "expires_at": "1794635015000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "nft_transfer_call bob ag055-1794613317-ticket -> escrow of grant 10",
+      "ok": true,
+      "tx": "4mGMGGwHkmMi1SQcKwj8N5T964HqAW6DBTub8Jyoh2Zp",
+      "signer": "bob.x207-v18-own.testnet",
+      "receiver": "nft.x207-b1-aux.testnet",
+      "method": "nft_transfer_call",
+      "failure": null,
+      "value": true,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "escrow_held",
+          "data": [
+            {
+              "grant_id": 10,
+              "nft_contract": "nft.x207-b1-aux.testnet",
+              "token_id": "ag055-1794613317-ticket"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "nft_mint ag055-1794613317-game-item to dan2",
+      "ok": true,
+      "tx": "5o2Y8UY1p7TD8FXqqZaAYi2mEpD3NzjcG7RkpamsGv2L",
+      "signer": "dan2.x207-v18-own.testnet",
+      "receiver": "nft.x207-b1-aux.testnet",
+      "method": "nft_mint",
+      "failure": null,
+      "value": null,
+      "events": []
+    },
+    {
+      "label": "offer_grant dan2 (game:item-nft ag055-1794613317-game-item, 25 credit)",
+      "ok": true,
+      "tx": "7wZ2gPEwopuiX8ofVfZkvSRhjwgkXtkk4Mbgb1EJpcU4",
+      "signer": "dan2.x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "offer_grant",
+      "failure": null,
+      "value": 11,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "grant_offered",
+          "data": [
+            {
+              "grant_id": 11,
+              "asset_type": "game:item-nft",
+              "grantor": "dan2.x207-v18-own.testnet",
+              "class": "A",
+              "unit": "once",
+              "unit_price": "25000000",
+              "expires_at": "1794635015000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "nft_transfer_call dan2 ag055-1794613317-game-item -> escrow of grant 11",
+      "ok": true,
+      "tx": "Edq6aEQPzbRrRy3nB7XYjLcAZCbdCYKUDuFayTq5AKg",
+      "signer": "dan2.x207-v18-own.testnet",
+      "receiver": "nft.x207-b1-aux.testnet",
+      "method": "nft_transfer_call",
+      "failure": null,
+      "value": true,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "escrow_held",
+          "data": [
+            {
+              "grant_id": 11,
+              "nft_contract": "nft.x207-b1-aux.testnet",
+              "token_id": "ag055-1794613317-game-item"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "complete_escrow bob buys ag055-1794613317-license of alice (grant 9, 24 credit)",
+      "ok": true,
+      "tx": "GWF3npguAhQALgfAjb7evpeDhGYHdWzD1yLwm3yGrp9K",
+      "signer": "bob.x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "complete_escrow",
+      "failure": null,
+      "value": null,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "voucher_registered",
+          "data": [
+            {
+              "payer": "bob.x207-v18-own.testnet",
+              "payee": "alice.x207-v18-own.testnet",
+              "epoch": 245,
+              "seq": 1,
+              "cumulative_amount": "24000000",
+              "delta": "24000000",
+              "obligation": "24000000",
+              "outstanding_debt": "24000000",
+              "mode": "cumulative"
+            }
+          ]
+        },
+        {
+          "standard": "x207",
+          "event": "grant_activated",
+          "data": [
+            {
+              "grant_id": 9,
+              "grantee": "bob.x207-v18-own.testnet",
+              "delivery_pubkey": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "complete_escrow dan2 buys ag055-1794613317-ticket of bob (grant 10, 32 credit)",
+      "ok": true,
+      "tx": "4ajpqavyrhBqhd6uBTMzKVkEAN5XzEtY4RfLXVarA7tz",
+      "signer": "dan2.x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "complete_escrow",
+      "failure": null,
+      "value": null,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "voucher_registered",
+          "data": [
+            {
+              "payer": "dan2.x207-v18-own.testnet",
+              "payee": "bob.x207-v18-own.testnet",
+              "epoch": 245,
+              "seq": 1,
+              "cumulative_amount": "32000000",
+              "delta": "32000000",
+              "obligation": "32000000",
+              "outstanding_debt": "32000000",
+              "mode": "cumulative"
+            }
+          ]
+        },
+        {
+          "standard": "x207",
+          "event": "grant_activated",
+          "data": [
+            {
+              "grant_id": 10,
+              "grantee": "dan2.x207-v18-own.testnet",
+              "delivery_pubkey": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "fund alice with 0.5 NEAR from dan2 (gas of complete_escrow)",
+      "ok": true,
+      "tx": "EvyDmeo97QU4Nhbihm1wGgj4dJuho2hQmyvMvQpH3QwB",
+      "signer": "dan2.x207-v18-own.testnet",
+      "receiver": "alice.x207-v18-own.testnet",
+      "method": "transfer",
+      "failure": null,
+      "value": null,
+      "events": []
+    },
+    {
+      "label": "complete_escrow alice buys ag055-1794613317-game-item of dan2 (grant 11, 25 credit)",
+      "ok": true,
+      "tx": "GmhhMhPjbMoucGJbCU9Qm7FaHXfkRCC1d6KdfeoXkvPz",
+      "signer": "alice.x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "complete_escrow",
+      "failure": null,
+      "value": null,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "voucher_registered",
+          "data": [
+            {
+              "payer": "alice.x207-v18-own.testnet",
+              "payee": "dan2.x207-v18-own.testnet",
+              "epoch": 245,
+              "seq": 1,
+              "cumulative_amount": "25000000",
+              "delta": "25000000",
+              "obligation": "25000000",
+              "outstanding_debt": "25000000",
+              "mode": "cumulative"
+            }
+          ]
+        },
+        {
+          "standard": "x207",
+          "event": "grant_activated",
+          "data": [
+            {
+              "grant_id": 11,
+              "grantee": "alice.x207-v18-own.testnet",
+              "delivery_pubkey": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "close_epoch 245",
+      "ok": true,
+      "tx": "GNho5FtbCd25CXJog6tW8s1JBjArNqoaGXJDpt3aLg15",
+      "signer": "dan2.x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "close_epoch",
+      "failure": null,
+      "value": null,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "epoch_cutoff",
+          "data": [
+            {
+              "epoch": 245,
+              "closed_at": "1794615346032880402",
+              "proposal_deadline": "1794615406032880402",
+              "edge_count": 3,
+              "participant_count": 3,
+              "total_obligation": "81000000",
+              "next_epoch": 246,
+              "next_cutoff_at": "1794617142637425679"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "submit_clearing 245",
+      "ok": true,
+      "tx": "9MfU2iY9Lt4XXTdSnnwqGnP4DRmZHhFdjMPFbtNdkXn9",
+      "signer": "bob.x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "submit_clearing",
+      "failure": null,
+      "value": null,
+      "events": [],
+      "note": "sent by hand from bob inside the proposal window: the script's relayer dan2 could not pay the state of its account (LackBalanceForStateActionError); same edges as clearing_proposal"
+    },
+    {
+      "label": "fund dan2 with 0.5 NEAR from bob (gas of complete_escrow)",
+      "ok": true,
+      "tx": "AV1tf8bnxWJo59RDnkYLXzKH1wykYhinDfE9Yxx2Ubc4",
+      "signer": "bob.x207-v18-own.testnet",
+      "receiver": "dan2.x207-v18-own.testnet",
+      "method": "transfer",
+      "failure": null,
+      "value": null,
+      "events": []
+    },
+    {
+      "label": "settle epoch 245 (alice pays 1 USDT)",
+      "ok": true,
+      "tx": "GhdHE2sdJR6K4Yvw1Bi3eTm6nhXRudCeb1HCKqwAR4wd",
+      "signer": "alice.x207-v18-own.testnet",
+      "receiver": "usdt.x207-deployer.testnet",
+      "method": "ft_transfer_call",
+      "failure": null,
+      "value": "1000000",
+      "events": [
+        {
+          "standard": "x207",
+          "event": "residual_paid",
+          "data": [
+            {
+              "epoch": 245,
+              "account_id": "alice.x207-v18-own.testnet",
+              "sender_id": "alice.x207-v18-own.testnet",
+              "amount": "1000000",
+              "refunded": "0",
+              "settled_history": "9000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "settle epoch 245 (dan2 pays 7 USDT)",
+      "ok": true,
+      "tx": "DKQXf66cXxq3DpjW2nSjqdHjrUMfKX6dB1TxVAvfJ11W",
+      "signer": "dan2.x207-v18-own.testnet",
+      "receiver": "usdt.x207-deployer.testnet",
+      "method": "ft_transfer_call",
+      "failure": null,
+      "value": "7000000",
+      "events": [
+        {
+          "standard": "x207",
+          "event": "residual_paid",
+          "data": [
+            {
+              "epoch": 245,
+              "account_id": "dan2.x207-v18-own.testnet",
+              "sender_id": "dan2.x207-v18-own.testnet",
+              "amount": "7000000",
+              "refunded": "0",
+              "settled_history": "7000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "finalize_epoch 245",
+      "ok": true,
+      "tx": "FTwZq3emNoYXfAoYwgGLX9fnHZ8KBTiVqF3EMSXUkTrA",
+      "signer": "bob.x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "finalize_epoch",
+      "failure": null,
+      "value": null,
+      "events": [
+        {
+          "standard": "x207",
+          "event": "limits_updated",
+          "data": [
+            {
+              "epoch": 245,
+              "changes": [
+                {
+                  "account_id": "alice.x207-v18-own.testnet",
+                  "old_limit": "120800000",
+                  "new_limit": "120900000",
+                  "status": "active"
+                },
+                {
+                  "account_id": "dan2.x207-v18-own.testnet",
+                  "old_limit": "120000000",
+                  "new_limit": "120700000",
+                  "status": "active"
+                }
+              ],
+              "chunk": 0,
+              "chunks": 1
+            }
+          ]
+        },
+        {
+          "standard": "x207",
+          "event": "epoch_finalized",
+          "data": [
+            {
+              "epoch": 245,
+              "finalized_at": "1794616319000397144",
+              "defaulted_count": 0,
+              "total_defaulted": "0",
+              "pool": "8000000",
+              "shortfall": "0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "claim epoch 245 (bob, near)",
+      "ok": true,
+      "tx": "8M8Y12NXRS9Qktc8BKeY5uXbQ4d2irAuXsJCTCjrex1V",
+      "signer": "bob.x207-v18-own.testnet",
+      "receiver": "x207-v018.testnet",
+      "method": "claim",
+      "failure": null,
+      "value": "8000000",
+      "events": [
+        {
+          "standard": "x207",
+          "event": "residual_claimed",
+          "data": [
+            {
+              "epoch": 245,
+              "account_id": "bob.x207-v18-own.testnet",
+              "amount": "8000000",
+              "destination": "near",
+              "status": "claimed"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "result": {
+    "pricing": {
+      "source": "fixed",
+      "reason": "the live appraiser gave alice 0, bob 0, dan2 0.5 credit: every price must be positive; a mock NFT of testnet has no market value, so the ring uses fixed prices",
+      "prices_credit": {
+        "alice": "24",
+        "bob": "32",
+        "dan2": "25"
+      }
+    },
+    "clearing_proposal": {
+      "edges": [
+        {
+          "debtor": "bob.x207-v18-own.testnet",
+          "creditor": "alice.x207-v18-own.testnet",
+          "cleared": "24000000"
+        },
+        {
+          "debtor": "dan2.x207-v18-own.testnet",
+          "creditor": "bob.x207-v18-own.testnet",
+          "cleared": "24000000"
+        },
+        {
+          "debtor": "alice.x207-v18-own.testnet",
+          "creditor": "dan2.x207-v18-own.testnet",
+          "cleared": "24000000"
+        }
+      ],
+      "simulated": {
+        "valid": true,
+        "cleared_total": "72000000",
+        "edge_count": 3,
+        "better_than_current": true,
+        "reason": null
+      }
+    },
+    "obligations_after_clearing": [
+      {
+        "epoch": 245,
+        "debtor": "bob.x207-v18-own.testnet",
+        "creditor": "alice.x207-v18-own.testnet",
+        "cumulative": "24000000",
+        "last_seq": 1,
+        "cleared": "24000000",
+        "obligation": "0"
+      },
+      {
+        "epoch": 245,
+        "debtor": "dan2.x207-v18-own.testnet",
+        "creditor": "bob.x207-v18-own.testnet",
+        "cumulative": "32000000",
+        "last_seq": 1,
+        "cleared": "24000000",
+        "obligation": "8000000"
+      },
+      {
+        "epoch": 245,
+        "debtor": "alice.x207-v18-own.testnet",
+        "creditor": "dan2.x207-v18-own.testnet",
+        "cumulative": "25000000",
+        "last_seq": 1,
+        "cleared": "24000000",
+        "obligation": "1000000"
+      }
+    ],
+    "positions_at_commit": [
+      {
+        "epoch": 245,
+        "account_id": "bob.x207-v18-own.testnet",
+        "net": "8000000",
+        "role": "creditor",
+        "status": "claimable",
+        "amount": "8000000",
+        "recovered": "0",
+        "payment_deadline": "1794616313078101642",
+        "updated_at_block": 277582559
+      },
+      {
+        "epoch": 245,
+        "account_id": "alice.x207-v18-own.testnet",
+        "net": "-1000000",
+        "role": "debtor",
+        "status": "due",
+        "amount": "1000000",
+        "recovered": "0",
+        "payment_deadline": "1794616313078101642",
+        "updated_at_block": 277582559
+      },
+      {
+        "epoch": 245,
+        "account_id": "dan2.x207-v18-own.testnet",
+        "net": "-7000000",
+        "role": "debtor",
+        "status": "due",
+        "amount": "7000000",
+        "recovered": "0",
+        "payment_deadline": "1794616313078101642",
+        "updated_at_block": 277582559
+      }
+    ],
+    "ring": [
+      {
+        "seller": "alice",
+        "buyer": "bob",
+        "asset_type": "license:software-nft",
+        "catalog_no": 5,
+        "nft_contract": "nft.x207-b1-aux.testnet",
+        "token_id": "ag055-1794613317-license",
+        "grant_id": 9,
+        "price_credit": "24",
+        "price_source": "fixed",
+        "appraisal_id": "apr_6b39593ef870414295e68916",
+        "appraised_credit": "0",
+        "appraisal_url": "https://v018.x207.boxd.sh/x207/appraisals/apr_6b39593ef870414295e68916",
+        "owner_before": "alice.x207-v18-own.testnet",
+        "owner_in_escrow": "x207-v018.testnet",
+        "owner_after": "bob.x207-v18-own.testnet",
+        "owner_now": "bob.x207-v18-own.testnet",
+        "tx": {
+          "nft_mint": "DSwRmXfsx5BFVuaKqR2cRjwHuM1RXBYYWeNZwpwTaYyh",
+          "offer_grant": "EpHVhsBwPF8mcinxr1auz3AjYkmTSsNjJMWjxrGXqek6",
+          "nft_transfer_call": "34szXeLQstDGusqc8YhpcCQ3XRFnSjQtVyJCBhXXp98v",
+          "complete_escrow": "GWF3npguAhQALgfAjb7evpeDhGYHdWzD1yLwm3yGrp9K"
+        },
+        "events": {
+          "nft_transfer_call": [
+            "escrow_held"
+          ],
+          "complete_escrow": [
+            "voucher_registered",
+            "grant_activated"
+          ]
+        },
+        "gross_credit": "24",
+        "cleared_credit": "24",
+        "residue_credit": "0"
+      },
+      {
+        "seller": "bob",
+        "buyer": "dan2",
+        "asset_type": "ticket:event-nft",
+        "catalog_no": 2,
+        "nft_contract": "nft.x207-b1-aux.testnet",
+        "token_id": "ag055-1794613317-ticket",
+        "grant_id": 10,
+        "price_credit": "32",
+        "price_source": "fixed",
+        "appraisal_id": "apr_46f4cf3721dbf5654341ae6b",
+        "appraised_credit": "0",
+        "appraisal_url": "https://v018.x207.boxd.sh/x207/appraisals/apr_46f4cf3721dbf5654341ae6b",
+        "owner_before": "bob.x207-v18-own.testnet",
+        "owner_in_escrow": "x207-v018.testnet",
+        "owner_after": "dan2.x207-v18-own.testnet",
+        "owner_now": "dan2.x207-v18-own.testnet",
+        "tx": {
+          "nft_mint": "9dLVK4Hh4hrHsUoumaUfNdzoPpeQPMf6Tj3cGoPCxPkn",
+          "offer_grant": "94CA4SbxbrYQhnWxqXpR91znfm5VhJYs7nyvENdyB9vu",
+          "nft_transfer_call": "4mGMGGwHkmMi1SQcKwj8N5T964HqAW6DBTub8Jyoh2Zp",
+          "complete_escrow": "4ajpqavyrhBqhd6uBTMzKVkEAN5XzEtY4RfLXVarA7tz"
+        },
+        "events": {
+          "nft_transfer_call": [
+            "escrow_held"
+          ],
+          "complete_escrow": [
+            "voucher_registered",
+            "grant_activated"
+          ]
+        },
+        "gross_credit": "32",
+        "cleared_credit": "24",
+        "residue_credit": "8"
+      },
+      {
+        "seller": "dan2",
+        "buyer": "alice",
+        "asset_type": "game:item-nft",
+        "catalog_no": 3,
+        "nft_contract": "nft.x207-b1-aux.testnet",
+        "token_id": "ag055-1794613317-game-item",
+        "grant_id": 11,
+        "price_credit": "25",
+        "price_source": "fixed",
+        "appraisal_id": "apr_5e4d612bb36446df7d765a7a",
+        "appraised_credit": "0.5",
+        "appraisal_url": "https://v018.x207.boxd.sh/x207/appraisals/apr_5e4d612bb36446df7d765a7a",
+        "owner_before": "dan2.x207-v18-own.testnet",
+        "owner_in_escrow": "x207-v018.testnet",
+        "owner_after": "alice.x207-v18-own.testnet",
+        "owner_now": "alice.x207-v18-own.testnet",
+        "tx": {
+          "nft_mint": "5o2Y8UY1p7TD8FXqqZaAYi2mEpD3NzjcG7RkpamsGv2L",
+          "offer_grant": "7wZ2gPEwopuiX8ofVfZkvSRhjwgkXtkk4Mbgb1EJpcU4",
+          "nft_transfer_call": "Edq6aEQPzbRrRy3nB7XYjLcAZCbdCYKUDuFayTq5AKg",
+          "complete_escrow": "GmhhMhPjbMoucGJbCU9Qm7FaHXfkRCC1d6KdfeoXkvPz"
+        },
+        "events": {
+          "nft_transfer_call": [
+            "escrow_held"
+          ],
+          "complete_escrow": [
+            "voucher_registered",
+            "grant_activated"
+          ]
+        },
+        "gross_credit": "25",
+        "cleared_credit": "24",
+        "residue_credit": "1"
+      }
+    ],
+    "totals": {
+      "gross_credit": "81",
+      "cleared_credit": "72",
+      "residue_credit": "9",
+      "usdt_due_ring_only": "8",
+      "usdt_due_share_of_gross_bps": 987,
+      "usdt_settled_on_chain": "8",
+      "chain_matches_plan": true
+    },
+    "per_member": {
+      "alice": {
+        "account": "alice.x207-v18-own.testnet",
+        "sold": "ag055-1794613317-license to bob",
+        "bought": "ag055-1794613317-game-item of dan2",
+        "gross_owed_credit": "24",
+        "gross_owes_credit": "25",
+        "cleared_credit": "24",
+        "net_credit": "-1"
+      },
+      "bob": {
+        "account": "bob.x207-v18-own.testnet",
+        "sold": "ag055-1794613317-ticket to dan2",
+        "bought": "ag055-1794613317-license of alice",
+        "gross_owed_credit": "32",
+        "gross_owes_credit": "24",
+        "cleared_credit": "24",
+        "net_credit": "8"
+      },
+      "dan2": {
+        "account": "dan2.x207-v18-own.testnet",
+        "sold": "ag055-1794613317-game-item to alice",
+        "bought": "ag055-1794613317-ticket of bob",
+        "gross_owed_credit": "25",
+        "gross_owes_credit": "32",
+        "cleared_credit": "24",
+        "net_credit": "-7"
+      }
+    },
+    "other_obligations_in_epoch": [],
+    "epoch": {
+      "number": 245,
+      "phase": "finalized",
+      "total_obligation": "81000000",
+      "total_cleared": "72000000",
+      "pool": "0",
+      "shortfall": "0"
+    },
+    "positions_final": [
+      {
+        "epoch": 245,
+        "account_id": "bob.x207-v18-own.testnet",
+        "net": "8000000",
+        "role": "creditor",
+        "status": "claimed",
+        "amount": "8000000",
+        "recovered": "0",
+        "payment_deadline": "1794616313078101642",
+        "updated_at_block": 277584071
+      },
+      {
+        "epoch": 245,
+        "account_id": "alice.x207-v18-own.testnet",
+        "net": "-1000000",
+        "role": "debtor",
+        "status": "paid",
+        "amount": "1000000",
+        "recovered": "0",
+        "payment_deadline": "1794616313078101642",
+        "updated_at_block": 277582594
+      },
+      {
+        "epoch": 245,
+        "account_id": "dan2.x207-v18-own.testnet",
+        "net": "-7000000",
+        "role": "debtor",
+        "status": "paid",
+        "amount": "7000000",
+        "recovered": "0",
+        "payment_deadline": "1794616313078101642",
+        "updated_at_block": 277582603
+      }
+    ],
+    "archival_check": {
+      "rpc": "https://archival-rpc.testnet.fastnear.com",
+      "method": "tx",
+      "params": "{tx_hash, sender_account_id, wait_until: FINAL}",
+      "all_ok": true,
+      "transactions": [
+        {
+          "step": "set_asset_class ticket:event-nft",
+          "tx": "FZEwSumTmmTSPnUkCsegUWrF2SvyoNXau233cWrNJ5R7",
+          "signer": "x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "set_asset_class",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "HqbV1VVMfdmSFwnjsWA8spRode6wgy6m7SmemahE37ok"
+        },
+        {
+          "step": "set_asset_class game:item-nft",
+          "tx": "HcE4uXMEXtU1qXf43fEBtSyXe7xcq8m6VxjSJk9HHBTv",
+          "signer": "x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "set_asset_class",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "AfKWUL2snQBBY1bKyzLX4N8LhXsHCLLmYHM9Eti8t94D"
+        },
+        {
+          "step": "set_asset_class license:software-nft",
+          "tx": "23RSGUUwMfqSMmuX86vCNdKQzoiLnT92L4ijV7FPgPLw",
+          "signer": "x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "set_asset_class",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "BBngCwFG7NTNx2Nu7331qZFizQprnYznanyzczrwfapx"
+        },
+        {
+          "step": "nft_mint ag055-1794613317-license to alice",
+          "tx": "DSwRmXfsx5BFVuaKqR2cRjwHuM1RXBYYWeNZwpwTaYyh",
+          "signer": "dan2.x207-v18-own.testnet",
+          "receiver": "nft.x207-b1-aux.testnet",
+          "method": "nft_mint",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "6CefPkdUsXzirX3KWbtrGUXJ1HTdfQszyaivcRDVqCu9"
+        },
+        {
+          "step": "offer_grant alice (license:software-nft ag055-1794613317-license, 24 credit)",
+          "tx": "EpHVhsBwPF8mcinxr1auz3AjYkmTSsNjJMWjxrGXqek6",
+          "signer": "alice.x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "offer_grant",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "9LNshkwKA34X2aKPGvb381gcm8RGfxWhCBAaFMRmiJSP"
+        },
+        {
+          "step": "nft_transfer_call alice ag055-1794613317-license -> escrow of grant 9",
+          "tx": "34szXeLQstDGusqc8YhpcCQ3XRFnSjQtVyJCBhXXp98v",
+          "signer": "alice.x207-v18-own.testnet",
+          "receiver": "nft.x207-b1-aux.testnet",
+          "method": "nft_transfer_call",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "BD31QvgPwC7LZHpT5TpMAC2CXUX6E8EGeDpyJMgD3Cgv"
+        },
+        {
+          "step": "nft_mint ag055-1794613317-ticket to bob",
+          "tx": "9dLVK4Hh4hrHsUoumaUfNdzoPpeQPMf6Tj3cGoPCxPkn",
+          "signer": "dan2.x207-v18-own.testnet",
+          "receiver": "nft.x207-b1-aux.testnet",
+          "method": "nft_mint",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "4eGkKzvGcZh5GwTEakBdMWKpFpLrpCXBSwde2rmjVwWi"
+        },
+        {
+          "step": "offer_grant bob (ticket:event-nft ag055-1794613317-ticket, 32 credit)",
+          "tx": "94CA4SbxbrYQhnWxqXpR91znfm5VhJYs7nyvENdyB9vu",
+          "signer": "bob.x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "offer_grant",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "FeQpd9gDZRmQ16kkyNxxuK7TwvzfqhaxFfcWhk6EsbY6"
+        },
+        {
+          "step": "nft_transfer_call bob ag055-1794613317-ticket -> escrow of grant 10",
+          "tx": "4mGMGGwHkmMi1SQcKwj8N5T964HqAW6DBTub8Jyoh2Zp",
+          "signer": "bob.x207-v18-own.testnet",
+          "receiver": "nft.x207-b1-aux.testnet",
+          "method": "nft_transfer_call",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "Fw14e8UihEsqFpgKrsQVb7JqVa9cMNDWLiNySdRy8stM"
+        },
+        {
+          "step": "nft_mint ag055-1794613317-game-item to dan2",
+          "tx": "5o2Y8UY1p7TD8FXqqZaAYi2mEpD3NzjcG7RkpamsGv2L",
+          "signer": "dan2.x207-v18-own.testnet",
+          "receiver": "nft.x207-b1-aux.testnet",
+          "method": "nft_mint",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "51n1HC2rErK5UTY86nZ4gAaDob84wxqnZRQFAs7N9QqJ"
+        },
+        {
+          "step": "offer_grant dan2 (game:item-nft ag055-1794613317-game-item, 25 credit)",
+          "tx": "7wZ2gPEwopuiX8ofVfZkvSRhjwgkXtkk4Mbgb1EJpcU4",
+          "signer": "dan2.x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "offer_grant",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "CrmD4y3BwRLjsHFoVMBNegzZk4jmLqrLgS81Xqq4fCU5"
+        },
+        {
+          "step": "nft_transfer_call dan2 ag055-1794613317-game-item -> escrow of grant 11",
+          "tx": "Edq6aEQPzbRrRy3nB7XYjLcAZCbdCYKUDuFayTq5AKg",
+          "signer": "dan2.x207-v18-own.testnet",
+          "receiver": "nft.x207-b1-aux.testnet",
+          "method": "nft_transfer_call",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "BZ8vxoMr6nHLgVXZFjDaLfiSxv2arhKTWG6ScRw4VjB4"
+        },
+        {
+          "step": "complete_escrow bob buys ag055-1794613317-license of alice (grant 9, 24 credit)",
+          "tx": "GWF3npguAhQALgfAjb7evpeDhGYHdWzD1yLwm3yGrp9K",
+          "signer": "bob.x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "complete_escrow",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "8j9LN4XjD7R9k3kipYCRGZVEzeo4cgeYoUw9s3bbhqSv"
+        },
+        {
+          "step": "complete_escrow dan2 buys ag055-1794613317-ticket of bob (grant 10, 32 credit)",
+          "tx": "4ajpqavyrhBqhd6uBTMzKVkEAN5XzEtY4RfLXVarA7tz",
+          "signer": "dan2.x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "complete_escrow",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "2TDtUxRLGeeXGv7U1oDKpzjpyfWmKwEeDajZDT16P5vt"
+        },
+        {
+          "step": "fund alice with 0.5 NEAR from dan2 (gas of complete_escrow)",
+          "tx": "EvyDmeo97QU4Nhbihm1wGgj4dJuho2hQmyvMvQpH3QwB",
+          "signer": "dan2.x207-v18-own.testnet",
+          "receiver": "alice.x207-v18-own.testnet",
+          "method": "transfer",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "G6jcaCDfGohfzqFsWHxz8zhAHdt6T6w8446Co8bPn23V"
+        },
+        {
+          "step": "complete_escrow alice buys ag055-1794613317-game-item of dan2 (grant 11, 25 credit)",
+          "tx": "GmhhMhPjbMoucGJbCU9Qm7FaHXfkRCC1d6KdfeoXkvPz",
+          "signer": "alice.x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "complete_escrow",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "DVa7TzpZ692aFmo6SwSMawTd8yEgnQaUnYVRNDzbc3SL"
+        },
+        {
+          "step": "close_epoch 245",
+          "tx": "GNho5FtbCd25CXJog6tW8s1JBjArNqoaGXJDpt3aLg15",
+          "signer": "dan2.x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "close_epoch",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "7Dk2AxL5NxEiwcXrewEyMCbsBvSb69Jy1xoyLJhC5DVs"
+        },
+        {
+          "step": "submit_clearing 245",
+          "tx": "9MfU2iY9Lt4XXTdSnnwqGnP4DRmZHhFdjMPFbtNdkXn9",
+          "signer": "bob.x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "submit_clearing",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "8SwCehjJKrYQbw7x69xRsVxTWFfbdth9nXyZ9k5Cu47W"
+        },
+        {
+          "step": "fund dan2 with 0.5 NEAR from bob (gas of complete_escrow)",
+          "tx": "AV1tf8bnxWJo59RDnkYLXzKH1wykYhinDfE9Yxx2Ubc4",
+          "signer": "bob.x207-v18-own.testnet",
+          "receiver": "dan2.x207-v18-own.testnet",
+          "method": "transfer",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "J7akYmECkcdL2D9uNed9yMYRej3HHbkoqmf6JGYyRVtF"
+        },
+        {
+          "step": "settle epoch 245 (alice pays 1 USDT)",
+          "tx": "GhdHE2sdJR6K4Yvw1Bi3eTm6nhXRudCeb1HCKqwAR4wd",
+          "signer": "alice.x207-v18-own.testnet",
+          "receiver": "usdt.x207-deployer.testnet",
+          "method": "ft_transfer_call",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "AJg2ArCYDj9iKA5sdzVdN96KZU1KNqMNNKyqujm5f2V4"
+        },
+        {
+          "step": "settle epoch 245 (dan2 pays 7 USDT)",
+          "tx": "DKQXf66cXxq3DpjW2nSjqdHjrUMfKX6dB1TxVAvfJ11W",
+          "signer": "dan2.x207-v18-own.testnet",
+          "receiver": "usdt.x207-deployer.testnet",
+          "method": "ft_transfer_call",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "EYE7fnXEZW51LMXbxxaR89kCvGZsuHcMDctUjEvitRkb"
+        },
+        {
+          "step": "finalize_epoch 245",
+          "tx": "FTwZq3emNoYXfAoYwgGLX9fnHZ8KBTiVqF3EMSXUkTrA",
+          "signer": "bob.x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "finalize_epoch",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "E7gf3TphVNC5iDr18RKn5ChnWfxL31dS8Rq8r4HphYg7"
+        },
+        {
+          "step": "claim epoch 245 (bob, near)",
+          "tx": "8M8Y12NXRS9Qktc8BKeY5uXbQ4d2irAuXsJCTCjrex1V",
+          "signer": "bob.x207-v18-own.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "claim",
+          "final_execution_status": "FINAL",
+          "ok": true,
+          "block_hash": "FRiUiLrUxcrr7a34BZ3Si2XYnYcXfqsEM9ozVtZLpbBk"
+        }
+      ],
+      "keeper_transactions": [
+        {
+          "step": "commit_epoch 245 (sent by the keeper, event epoch_committed)",
+          "tx": "GaSauXHgid7qUxxWNqwjGkaRjhndpzvzYYXk2qKFbArV",
+          "signer": "x207-v013-aux.testnet",
+          "receiver": "x207-v018.testnet",
+          "method": "commit_epoch",
+          "block_height": 277582559,
+          "final_execution_status": "FINAL",
+          "ok": true
+        }
+      ]
+    },
+    "links": {
+      "dashboard_epoch": "https://x207.vercel.app/stats?epoch=245&circle=v018",
+      "api_epoch_metrics": "https://v018.x207.boxd.sh/x207/circles/agents-main/epochs/245/metrics"
+    }
+  },
+  "epoch": 245,
+  "finished_at": "2026-11-14T00:32:13.886Z"
+}
