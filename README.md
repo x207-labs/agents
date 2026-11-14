@@ -100,7 +100,7 @@ An agent listens on `127.0.0.1` (AG-038). `AGENT_HOST` picks another interface, 
 
 ```bash
 npm test
-npm run typecheck
+npm run typecheck       # clean in the umbrella; on this repository alone it shows 3 TS2307 errors from the sandbox tests, which need umbrella packages (see "Read more")
 npm run test:sandbox    # X207_SANDBOX=1, needs near-sandbox (run from the umbrella)
 ```
 
