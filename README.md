@@ -54,6 +54,11 @@ curl "localhost:4202/api/summarize?input=hello"
 
 Mock mode answers `{"agent":"summarizer","result":"[mock:summarizer] hello"}`. The full story, six agents trading for four epochs on a local circle, is `npm run demo:swarm` in the [umbrella](https://github.com/x207-labs/x207#run-it-locally-5-minutes).
 
+Two barter rings ran on testnet (`x207-v018.testnet`, mock USDT, one operator played all three members):
+
+- [`docs/demo-barter-cycle.md`](docs/demo-barter-cycle.md), epoch 184 (`scripts/demo-barter-cycle.ts`). Three appraised assets were traded in one signed bundle; 72 of 81 credit cleared. Only credit moved.
+- [`docs/demo-barter-ring-assets.md`](docs/demo-barter-ring-assets.md), epoch 245 (`scripts/demo-barter-ring-assets.ts`). Three mock NFTs moved to their buyers through contract escrow, at prices the operator set; 72 of 81 credit cleared.
+
 ## Test
 
 ```bash
